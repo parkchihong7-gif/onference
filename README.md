@@ -6,11 +6,28 @@
 
 ## 실행
 
+### 1) 단일 HTML 파일 (권장 · 설치 불필요)
+
+`onference-dashboard.html` **한 파일만 내려받아 브라우저로 열면** 바로 동작한다.
+서버·설치·인터넷 연결이 필요 없고, 사내 공유 폴더나 USB에 두고 그대로 사용할 수 있다.
+
+```
+onference-dashboard.html   ← 더블클릭 (Chrome / Edge / Safari)
+```
+
+- CSS·JS·데이터가 모두 이 파일 안에 인라인되어 있어 외부 의존성이 없다 (약 400KB).
+- 입력한 내용은 **연 브라우저의 localStorage** 에 저장된다(파일 자체는 변경되지 않음).
+  따라서 같은 PC·같은 브라우저에서 이어서 작업할 수 있고, 다른 사람과 자동 동기화되지는 않는다.
+- 소스를 수정한 뒤에는 `npm run build:html` 로 이 파일을 다시 생성한다.
+
+### 2) 개발 모드 (소스 수정 시)
+
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # 타입 체크 + 정적 빌드(dist)
-npm run preview  # 빌드 결과 미리보기
+npm run dev         # http://localhost:5173
+npm run build       # 타입 체크 + 정적 빌드(dist)
+npm run preview     # 빌드 결과 미리보기
+npm run build:html  # 단일 HTML 파일(onference-dashboard.html) 재생성
 ```
 
 - 서버·DB 없이 브라우저에서 동작하며, 상태는 `localStorage` 에 저장된다.
@@ -52,6 +69,8 @@ npm run preview  # 빌드 결과 미리보기
 - 라이트/다크 테마 토큰(`src/styles.css`), 인쇄 레이아웃(개인 일정표·런시트) 지원
 
 ```
+onference-dashboard.html  단일 파일 배포본(빌드 산출물)
+scripts/build-html.mjs    단일 HTML 빌드 스크립트(JS·CSS 인라인)
 src/
   types.ts          도메인 모델
   data/seed.ts      데모 시드(행사·연사·세션·업무·템플릿·이력)
