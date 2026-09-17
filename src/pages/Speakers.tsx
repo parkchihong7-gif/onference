@@ -36,7 +36,7 @@ export function Speakers() {
     const body = rows.map(s => {
       const r = readiness(s)
       return [
-        s.code, s.nameEn, s.title, s.affiliation, s.country, s.tier, s.stage, s.attendanceMode,
+        s.code, s.nameEn, s.title, s.affiliation, s.country, s.tier, s.stage, s.attendance, s.sponsorship, s.attendanceMode,
         state.members.find(m => m.id === s.liaisonMemberId)?.name, s.visa.required ? 'Y' : 'N', s.visa.stage,
         s.flights.some(f => f.eTicketReceived) ? '발권완료' : s.flights.length ? '스케줄확정' : '미확정',
         s.hotel?.confirmationNo ? '확정' : s.hotel ? '가예약' : '-',
@@ -87,7 +87,7 @@ export function Speakers() {
           <table className="data">
             <thead>
               <tr>
-                <th>연사</th><th>등급</th><th>단계</th><th>세션</th><th>담당</th>
+                <th>연사</th><th>등급</th><th>단계</th><th>참석</th><th>지원</th><th>담당</th>
                 <th>입국/비자</th><th>항공·숙박</th><th>제출물</th><th>준비도</th><th className="right">강연료</th><th>수정</th>
               </tr>
             </thead>
@@ -122,7 +122,8 @@ function Row({ s, liaisonName }: { s: Speaker; liaisonName: string }) {
       </td>
       <td><TierTag tier={s.tier} /></td>
       <td><StatusBadge status={s.stage} /></td>
-      <td className="xsmall muted">{s.sessionIds.join(', ') || '-'}</td>
+      <td><Badge tone={s.attendance === '참석확정' ? 'good' : s.attendance === '참석미정' ? 'warning' : 'neutral'}>{s.attendance}</Badge></td>
+      <td className="small nowrap">{s.sponsorship === 'Sponsored' ? <span className="chip">전액</span> : s.sponsorship === '부분지원' ? <span className="chip">부분</span> : <span className="chip">자비</span>}</td>
       <td className="small nowrap">{liaisonName}</td>
       <td className="small nowrap">
         {s.attendanceMode === '온라인' ? <Badge tone="neutral">온라인</Badge>

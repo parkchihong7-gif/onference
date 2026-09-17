@@ -4,7 +4,7 @@
  * 인물/기관명은 모두 가상이며, 내부 기능 검증용이다.
  */
 import type {
-  AppState, ChecklistTemplate, Communication, Conference, Deliverable, DeliverableType,
+  AppState, ChecklistTemplate, Communication, Conference, Currency, Deliverable, DeliverableType,
   Flight, ID, MailTemplate, Member, Session, Speaker, SupportPackage, Task, AuditLog,
 } from '../types'
 import { PHASES } from '../types'
@@ -207,6 +207,13 @@ const DELIVERABLE_PLAN: { type: DeliverableType; offset: number; euOnly?: boolea
 ]
 
 const EU_COUNTRIES = ['프랑스', '독일', '네덜란드', '노르웨이', '이탈리아']
+
+/** 여권번호 접두 등 표기에 쓰는 국가 코드 */
+export const COUNTRY_CODE: Record<string, string> = {
+  영국: 'GB', 프랑스: 'FR', 싱가포르: 'SG', 인도: 'IN', 이집트: 'EG', 독일: 'DE', 일본: 'JP',
+  멕시코: 'MX', 베트남: 'VN', 미국: 'US', 나이지리아: 'NG', 네덜란드: 'NL', 중국: 'CN',
+  호주: 'AU', 노르웨이: 'NO', 캐나다: 'CA', 이탈리아: 'IT',
+}
 const STAGE_RANK: Record<string, number> = {
   '후보발굴': 0, '내부승인': 1, '사전타진': 2, '공식초청': 3, '수락': 4, '계약완료': 5, '거절': -1, '취소': -1,
 }
@@ -278,7 +285,13 @@ interface Spec {
   dietary?: string
   accessibility?: string
   interpretation?: boolean
-  companions?: Speaker['companions']
+  companions?: (Partial<Speaker['companions'][number]> & { name: string; relation: string })[]
+  attendance?: Speaker['attendance']
+  sponsorship?: Speaker['sponsorship']
+  principal?: ID
+  /** 데모용: 항공권 탑승자명을 여권명과 다르게 입력(휴먼에러 재현) */
+  ticketNameOverride?: string
+  noHotel?: boolean
   recommendedBy?: string
   previousParticipation?: string
   treatyRate?: number          // 조세조약 제한세율(%) — 미적용 시 22%
@@ -299,63 +312,132 @@ function mk(s: Spec): Speaker {
   const pkg = supportPackages.find(p => p.id === s.pkg)!
   const treaty = s.treatyRate !== undefined
   const onsite = mode !== '온라인'
-  const nights = s.hotelNights ?? pkg.hotelNights
+  const sponsorship = s.sponsorship ?? 'Sponsored'
+  const selfFunded = sponsorship === 'Non-Sponsored'
+  const supportedNights = s.hotelNights ?? pkg.hotelNights
+  const confirmed = rank >= 4
+  const contracted = rank === 5
+
+  /* 여권 영문명·번호는 항공 탑승자명과 반드시 일치해야 하므로 한 곳에서 생성한다 */
+  const passportName = s.nameEn.replace(/^(Prof\.|Dr\.|Mr\.|Ms\.)\s/, '').toUpperCase()
+  const passportNo = `${COUNTRY_CODE[s.country] ?? 'XX'}${hash(code + 'pp') % 9000000 + 1000000}`.replace(/(\d{3})(\d+)/, '$1****')
+
   const flights: Flight[] = []
   const transfers: Speaker['transfers'] = []
 
-  if (s.route && rank >= 4 && onsite) {
+  /* 체류 기간은 배정된 세션·공식 행사 일정에서 역산한다.
+     (갈라디너·리셉션 참석 대상은 해당 일자도 체류에 포함) */
+  const programDates = [
+    ...(s.sessionIds ?? []).map(id => sessions.find(x => x.id === id)?.date).filter(Boolean) as string[],
+    ...(['Keynote', 'Invited'].includes(s.tier) && onsite ? ['2026-11-19'] : []),
+    ...(s.tier === 'Keynote' && onsite ? ['2026-11-17'] : []),
+  ].sort()
+  const firstDay = programDates[0] ?? START
+  const lastDay = programDates[programDates.length - 1] ?? addDays(START, 1)
+  const arrDate = addDays(firstDay, -1)
+  const depDate = addDays(lastDay, 1)
+  /** 실제 필요한 숙박 박수 (지원 패키지 한도와 다를 수 있음 → 정합성 검증 대상) */
+  const stayNights = Math.max(1, Math.round((new Date(depDate).getTime() - new Date(arrDate).getTime()) / 86_400_000))
+
+  if (s.route && confirmed && onsite) {
     const r = s.route
     const jitter = hash(code) % 5
-    const arrDate = addDays(START, -1)
-    const depDate = addDays(START, 3)
-    flights.push({
-      id: `${code}-F1`, direction: '입국', carrier: r.carrier, flightNo: r.inNo,
-      from: r.iata, to: 'ICN',
-      departAt: `${addDays(arrDate, r.hours > 10 ? -1 : 0)}T${String(9 + jitter).padStart(2, '0')}:40`,
-      arriveAt: `${arrDate}T${String(13 + jitter).padStart(2, '0')}:25`,
-      cabin: pkg.airCabin, pnr: rank === 5 ? `${r.carrier}${hash(code + 'pnr') % 900000 + 100000}` : undefined,
-      ticketedBy: pkg.airTicketedBy, eTicketReceived: rank === 5,
-      fare: r.fare, currency: r.cur as Speaker['settlement']['currency'],
+    const arriveAt = `${arrDate}T${String(13 + jitter).padStart(2, '0')}:25`
+    const departAt = `${depDate}T${String(10 + jitter).padStart(2, '0')}:15`
+    const bookingClass = pkg.airCabin === '비즈니스' ? `BZ${200 + (hash(code) % 80)}`
+      : pkg.airCabin === '프리미엄이코노미' ? `PY${100 + (hash(code) % 80)}` : `EY${100 + (hash(code) % 80)}`
+    const mk1 = (dir: '입국' | '출국', flightNo: string, dep: string, arr: string): Flight => ({
+      id: `${code}-F${dir === '입국' ? 1 : 2}`, direction: dir, carrier: r.carrier, flightNo,
+      from: dir === '입국' ? r.iata : 'ICN', fromCity: dir === '입국' ? r.cityEn : 'Seoul, KR',
+      to: dir === '입국' ? 'ICN' : r.iata, toCity: dir === '입국' ? 'Seoul, KR' : r.cityEn,
+      departAt: dep, arriveAt: arr,
+      boardingTime: `${String(Number(dep.slice(11, 13)) - 1).padStart(2, '0')}:${dep.slice(14, 16)}`,
+      cabin: pkg.airCabin, bookingClass,
+      seat: contracted ? `${(hash(code + dir) % 30) + 1}${'ABCDFGHJK'[hash(code + dir) % 9]}` : undefined,
+      terminal: r.carrier === 'KE' || r.carrier === 'AF' || r.carrier === 'VN' ? 'T2' : 'T1',
+      gate: contracted ? `${'ABCD'[hash(code + dir) % 4]}${(hash(code + dir + 'g') % 40) + 1}` : undefined,
+      /* 탑승자명은 여권 영문명과 동일해야 한다 — 데모용으로 1건은 의도적으로 불일치시킨다 */
+      passengerName: s.ticketNameOverride ?? passportName,
+      passportNumber: passportNo,
+      pnr: contracted ? `${r.carrier}${hash(code + 'pnr') % 900000 + 100000}` : undefined,
+      ticketedBy: selfFunded ? '본인구매후정산' : pkg.airTicketedBy,
+      eTicketReceived: contracted,
+      status: contracted ? '확정' : '가예약',
+      fare: dir === '입국' ? r.fare : 0,
+      currency: r.cur as Currency,
       baggage: pkg.airCabin === '비즈니스' ? '2PC 32kg' : '1PC 23kg',
     })
-    flights.push({
-      id: `${code}-F2`, direction: '출국', carrier: r.carrier, flightNo: r.outNo,
-      from: 'ICN', to: r.iata,
-      departAt: `${depDate}T${String(10 + jitter).padStart(2, '0')}:15`,
-      arriveAt: `${depDate}T${String(16 + jitter).padStart(2, '0')}:05`,
-      cabin: pkg.airCabin, pnr: rank === 5 ? `${r.carrier}${hash(code + 'pnr') % 900000 + 100000}` : undefined,
-      ticketedBy: pkg.airTicketedBy, eTicketReceived: rank === 5,
-      fare: 0, currency: r.cur as Speaker['settlement']['currency'],
-    })
-    if (pkg.groundTransfer) {
+    flights.push(mk1('입국', r.inNo, `${addDays(arrDate, r.hours > 10 ? -1 : 0)}T${String(9 + jitter).padStart(2, '0')}:40`, arriveAt))
+    flights.push(mk1('출국', r.outNo, departAt, `${depDate}T${String(16 + jitter).padStart(2, '0')}:05`))
+
+    if (pkg.groundTransfer && !selfFunded) {
       transfers.push({
         id: `${code}-T1`, kind: '공항픽업', at: `${arrDate}T${String(14 + jitter).padStart(2, '0')}:10`,
-        fromPlace: '인천공항 제2터미널 입국장 E', toPlace: HOTEL,
+        fromPlace: `인천공항 제2터미널 입국장 E`, toPlace: HOTEL,
         vehicle: pkg.tier === 'Keynote' ? '카니발 하이리무진' : '카니발 9인승',
         meetingPoint: '입국장 E 게이트 · 연사명 피켓',
-        assignedMemberId: s.liaison,
-        status: rank === 5 ? '확정' : '예정',
+        assignedMemberId: s.liaison, flightNo: r.inNo,
+        status: contracted ? '확정' : '요청',
       })
       transfers.push({
         id: `${code}-T2`, kind: '공항샌딩', at: `${depDate}T${String(7 + jitter).padStart(2, '0')}:00`,
-        fromPlace: HOTEL, toPlace: '인천공항 제2터미널',
-        vehicle: '카니발 9인승', assignedMemberId: s.liaison, status: rank === 5 ? '확정' : '예정',
+        fromPlace: HOTEL, toPlace: '인천공항 제2터미널', vehicle: '카니발 9인승',
+        assignedMemberId: s.liaison, flightNo: r.outNo,
+        status: contracted ? '확정' : '요청',
+      })
+    }
+    transfers.push({
+      id: `${code}-T3`, kind: '행사장이동', at: `${firstDay}T08:20`,
+      fromPlace: HOTEL, toPlace: '코엑스 그랜드볼룸 VIP 출입구',
+      vehicle: '셔틀(연사 전용)', assignedMemberId: s.liaison,
+      status: contracted ? '확정' : '요청', memo: '도보 5분 · 우천 시 셔틀 운행',
+    })
+  }
+
+  /* 프로그램 등록 — 배정 세션 + 등급별 공식 행사 */
+  const programs: Speaker['programs'] = []
+  if (rank >= 3) {
+    (s.sessionIds ?? []).forEach((sid, i) => {
+      const ses = sessions.find(x => x.id === sid)
+      if (!ses) return
+      programs.push({
+        id: `${code}-P${i + 1}`, name: ses.title,
+        type: s.tier === 'Moderator' ? '좌장' : ses.type === '워크숍' ? '워크숍' : '세션발표',
+        sessionId: sid, date: ses.date, time: `${ses.startTime}–${ses.endTime}`, place: ses.room,
+        status: confirmed ? '등록' : '대기',
+      })
+    })
+    if (onsite && ['Keynote', 'Invited'].includes(s.tier)) {
+      programs.push({
+        id: `${code}-PG`, name: 'Gala Dinner & Award Ceremony', type: '만찬',
+        date: '2026-11-19', time: '18:30–21:00', place: '인터컨티넨탈 하모니볼룸',
+        status: confirmed ? '등록' : '대기',
+        seat: contracted ? `Table ${(hash(code + 'tbl') % 12) + 1}` : undefined,
+        note: s.dietary ? `특별식: ${s.dietary}` : undefined,
+      })
+    }
+    if (onsite && s.tier === 'Keynote') {
+      programs.push({
+        id: `${code}-PW`, name: 'Welcome Reception (조직위 주최)', type: '리셉션',
+        date: '2026-11-17', time: '19:00–21:00', place: '코엑스 아셈볼룸',
+        status: confirmed ? '등록' : '대기',
       })
     }
   }
 
   const honorarium = s.honorariumKRW ?? pkg.honorariumKRW
   const expenses: Speaker['settlement']['expenses'] = []
-  if (rank >= 4 && onsite && s.route) {
+  if (confirmed && onsite && s.route && !selfFunded) {
     expenses.push({
       id: `${code}-E1`, category: '항공', description: `${s.route.iata}–ICN 왕복 (${pkg.airCabin})`,
-      amount: s.route.fare, currency: s.route.cur as Speaker['settlement']['currency'],
-      amountKRW: toKRW(s.route.fare, s.route.cur), receipt: rank === 5,
-      status: rank === 5 ? '청구' : '예정',
+      amount: s.route.fare, currency: s.route.cur as Currency,
+      amountKRW: toKRW(s.route.fare, s.route.cur), receipt: contracted,
+      status: contracted ? '청구' : '예정',
     })
     expenses.push({
-      id: `${code}-E2`, category: '숙박', description: `${HOTEL} ${nights}박 (${pkg.hotelGrade})`,
-      amount: nights * 320_000, currency: 'KRW', amountKRW: nights * 320_000,
+      id: `${code}-E2`, category: '숙박',
+      description: `${HOTEL} ${stayNights}박 (${pkg.hotelGrade}${stayNights > supportedNights ? ` · 지원 ${supportedNights}박 초과` : ''})`,
+      amount: stayNights * 320_000, currency: 'KRW', amountKRW: stayNights * 320_000,
       receipt: false, status: '예정',
     })
     expenses.push({
@@ -371,33 +453,67 @@ function mk(s: Spec): Speaker {
     }
   }
 
+  const companions: Speaker['companions'] = (s.companions ?? []).map((c, i) => ({
+    id: c.id ?? `${code}-AC${i + 1}`,
+    name: c.name, relation: c.relation,
+    nationality: c.nationality ?? s.country,
+    attendance: c.attendance ?? '참석확정',
+    visaRequired: c.visaRequired ?? s.visa.required,
+    visaStage: c.visaStage,
+    passportReceived: c.passportReceived ?? false,
+    supported: c.supported ?? false,
+    shareRoom: c.shareRoom ?? true,
+    ownFlight: c.ownFlight ?? false,
+    programIds: c.programIds,
+    memo: c.memo,
+  }))
+
+  const attendance: Speaker['attendance'] =
+    s.attendance ?? (s.stage === '거절' ? '불참' : s.stage === '취소' ? '취소' : contracted ? '참석확정' : '참석미정')
+
+  const protocol: Speaker['protocol'] = {
+    level: s.tier === 'Keynote' ? 'VVIP' : ['Invited', 'Moderator'].includes(s.tier) ? 'VIP' : '일반',
+    greeterMemberId: onsite && confirmed ? s.liaison : undefined,
+    greetingPoint: onsite && confirmed ? (s.tier === 'Keynote' ? '입국장 E 게이트 · 의전 영접' : '입국장 E 게이트') : undefined,
+    loungeAccess: ['Keynote', 'Invited'].includes(s.tier) && onsite,
+    seatingOrder: s.tier === 'Keynote' ? (hash(code) % 6) + 1 : undefined,
+    giftPrepared: false,
+    photoSession: s.tier === 'Keynote' && onsite,
+    escortVehicle: s.tier === 'Keynote' && onsite && !selfFunded ? '의전 차량(제네시스)' : undefined,
+    status: !onsite ? '미정' : contracted ? '확정' : confirmed ? '요청' : '미정',
+    note: s.accessibility ? `접근성 지원: ${s.accessibility}` : undefined,
+  }
+
   return {
     id: code, code, conferenceId: CONF_MAIN,
     nameEn: s.nameEn, title: s.title, affiliation: s.affiliation, department: s.department,
     country: s.country, city: s.city, timezone: s.tz,
-    email: `${s.nameEn.split(' ').slice(-1)[0].toLowerCase()}@${s.affiliation.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}.example.org`,
+    email: `${s.nameEn.split(' ').slice(-1)[0].toLowerCase().replace(/[^a-z]/g, '')}@${s.affiliation.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}.example.org`,
     phone: `+${(hash(code) % 89) + 10}-${hash(code + 'p') % 900 + 100}-${hash(code + 'q') % 9000 + 1000}`,
     assistantName: s.tier === 'Keynote' ? 'Executive Assistant' : undefined,
     assistantEmail: s.tier === 'Keynote' ? `office@${s.affiliation.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}.example.org` : undefined,
     researchFields: s.fields, languages: s.langs,
     profileUrl: `https://scholar.example.org/${s.nameEn.replace(/\s/g, '-').toLowerCase()}`,
-    tier: s.tier, stage: s.stage, priority: s.priority ?? (s.tier === 'Keynote' ? '상' : '중'),
+    tier: s.tier, stage: s.stage, attendance, sponsorship,
+    priority: s.priority ?? (s.tier === 'Keynote' ? '상' : '중'),
     attendanceMode: mode, recommendedBy: s.recommendedBy,
     previousParticipation: s.previousParticipation,
-    supportPackageId: s.pkg, liaisonMemberId: s.liaison, sessionIds: s.sessionIds ?? [],
+    supportPackageId: s.pkg, liaisonMemberId: s.liaison,
+    principalMemberId: s.principal ?? 'M01',
+    sessionIds: s.sessionIds ?? [],
     firstContactAt: rank >= 2 ? addDays(START, -165 + (hash(code) % 10)) : undefined,
     replyDueAt: rank >= 3 ? addDays(START, -135 + (hash(code) % 8)) : undefined,
-    acceptedAt: rank >= 4 ? addDays(START, -130 + (hash(code) % 20)) : undefined,
+    acceptedAt: confirmed ? addDays(START, -130 + (hash(code) % 20)) : undefined,
     declinedAt: s.stage === '거절' ? addDays(START, -132) : undefined,
     declineReason: s.declineReason,
-    agreementStatus: s.agreement ?? (rank === 5 ? '서명완료' : rank === 4 ? '발송' : '미발송'),
-    agreementSignedAt: (s.agreement ?? (rank === 5 ? '서명완료' : '')) === '서명완료' ? addDays(START, -108 + (hash(code) % 12)) : undefined,
+    agreementStatus: s.agreement ?? (contracted ? '서명완료' : confirmed ? '발송' : '미발송'),
+    agreementSignedAt: (s.agreement ?? (contracted ? '서명완료' : '')) === '서명완료' ? addDays(START, -108 + (hash(code) % 12)) : undefined,
     dietary: s.dietary, accessibility: s.accessibility,
     interpretationNeeded: s.interpretation ?? false,
-    companions: s.companions ?? [],
-    passport: rank >= 4 && onsite ? {
-      nameEn: s.nameEn.replace(/^(Prof\.|Dr\.|Mr\.|Ms\.)\s/, '').toUpperCase(),
-      numberMasked: `${s.country.slice(0, 1)}${hash(code + 'pp') % 9000000 + 1000000}`.replace(/(\d{3})(\d+)/, '$1****'),
+    companions,
+    passport: confirmed && onsite ? {
+      nameEn: passportName,
+      numberMasked: passportNo,
       nationality: s.country,
       issueDate: '2021-0' + ((hash(code) % 8) + 1) + '-1' + (hash(code) % 9),
       expiryDate: s.passportExpiry ?? '2031-0' + ((hash(code) % 8) + 1) + '-1' + (hash(code) % 9),
@@ -405,28 +521,46 @@ function mk(s: Spec): Speaker {
     } : undefined,
     visa: s.visa,
     flights,
-    hotel: rank >= 4 && onsite ? {
+    hotel: confirmed && onsite && !s.noHotel ? {
       hotel: HOTEL, address: '서울 강남구 테헤란로 521',
-      checkIn: addDays(START, -1), checkOut: addDays(START, -1 + nights), nights,
-      roomType: pkg.hotelGrade, billing: pkg.hotelBilling,
-      confirmationNo: rank === 5 ? `IC${hash(code + 'h') % 900000 + 100000}` : undefined,
+      checkIn: arrDate,
+      // 체크인 시각은 공항 도착 + 이동 1시간 이후로 잡는다(호텔 기본 15:00 이전이면 15:00)
+      checkInTime: (() => {
+        const arr = flights.find(f => f.direction === '입국')?.arriveAt.slice(11, 16)
+        if (!arr) return '15:00'
+        const h = Number(arr.slice(0, 2)) + 1
+        return h <= 15 ? '15:00' : `${String(h).padStart(2, '0')}:${arr.slice(3, 5)}`
+      })(),
+      checkOut: depDate, checkOutTime: '11:00', nights: stayNights,
+      roomNumber: contracted ? `${(hash(code + 'rm') % 18) + 10}${String(hash(code + 'rn') % 20 + 1).padStart(2, '0')}` : undefined,
+      roomType: pkg.hotelGrade,
+      bedType: pkg.tier === 'Keynote' ? 'King Bed' : companions.some(c => c.shareRoom) ? 'Twin Bed' : 'Double Bed',
+      guests: 1 + companions.filter(c => c.shareRoom).length,
+      breakfastIncluded: true,
+      specialMeal: s.dietary,
+      billing: selfFunded ? '본인결제후정산' : pkg.hotelBilling,
+      confirmationNo: contracted ? `IC${hash(code + 'h') % 900000 + 100000}` : undefined,
+      status: contracted ? '확정' : '가예약',
       ratePerNight: 320_000, currency: 'KRW',
       requests: s.dietary ? `조식 ${s.dietary} 대응 요청` : undefined,
     } : undefined,
     transfers,
+    protocol,
+    programs,
+    supportedNights,
     deliverables: makeDeliverables(code, s.stage, s.country, mode, treaty),
     settlement: {
       honorarium, currency: 'KRW',
       withholdingRate: s.treatyRate ?? 22,
       taxTreatyApplied: treaty,
       treatyCountry: treaty ? s.country : undefined,
-      corReceived: treaty ? rank === 5 && hash(code) % 3 !== 0 : false,
+      corReceived: treaty ? contracted && hash(code) % 3 !== 0 : false,
       netPayment: Math.round(honorarium * (1 - (s.treatyRate ?? 22) / 100)),
-      remittance: rank >= 4 ? {
+      remittance: confirmed ? {
         bankName: pick(code + 'bank', ['HSBC', 'Citibank', 'Deutsche Bank', 'DBS Bank', 'BNP Paribas', 'Standard Chartered']),
         swift: `${pick(code + 'sw', ['HSBC', 'CITI', 'DEUT', 'DBSS'])}${s.country.slice(0, 2).toUpperCase()}XX`,
         accountMasked: `****${hash(code + 'acc') % 9000 + 1000}`,
-        beneficiary: s.nameEn.replace(/^(Prof\.|Dr\.)\s/, '').toUpperCase(),
+        beneficiary: passportName,
         feeBearer: '주최부담(OUR)',
       } : undefined,
       expenses,
@@ -451,7 +585,8 @@ export const speakers: Speaker[] = [
     sessionIds: ['S02'], interpretation: true,
     visa: { required: false, track: 'K-ETA', stage: '해당없음', ketaRequired: true, ketaStatus: '승인', ccviRequired: false, leadTimeDays: 3, guaranteeLetterRequired: false, memo: 'K-ETA 승인 완료(유효기간 3년).' },
     route: R('LHR', 'London', 'KE', 'KE908', 'KE907', 4300, 'GBP', 11),
-    dietary: '해산물 알러지', companions: [{ id: 'C1', name: 'Helen Mercer', relation: '배우자', visaRequired: false, supported: true, memo: '숙박 공유 · 갈라디너 참석' }],
+    dietary: '해산물 알러지',
+    companions: [{ name: 'Helen Mercer', relation: '배우자', visaRequired: false, supported: true, shareRoom: true, passportReceived: false, memo: '숙박 공유 · 갈라디너 참석(동반 등록 완료)' }],
     recommendedBy: '조직위원장 추천', previousParticipation: 'SSC2023 패널 참여',
     treatyRate: 0, tags: ['VIP', '기조연설', '언론인터뷰'], memo: '개회 기조연설. 도착일 언론 인터뷰 1건 예정(11/17 16:00).',
   }),
@@ -504,7 +639,7 @@ export const speakers: Speaker[] = [
       memo: '⚠ 여권 사본 미수신. CCVI 신청(법무부 심사 약 20일) + 영사 심사 30일 필요 — 일정 위험.',
     },
     route: R('CAI', 'Cairo', 'QR', 'QR1304', 'QR1305', 2800, 'USD', 14),
-    dietary: '할랄', interpretation: false, tags: ['비자위험', 'D-day경보'],
+    dietary: '할랄', interpretation: false, attendance: '참석미정', tags: ['비자위험', 'D-day경보'],
     memo: '비자 리드타임 역산 시 즉시 서류 수취 필요. 9/20까지 미수신 시 온라인 발표로 전환 검토.',
   }),
   mk({
@@ -515,7 +650,8 @@ export const speakers: Speaker[] = [
     sessionIds: ['S07'],
     visa: { required: false, track: '면제(무비자)', stage: '해당없음', ketaRequired: false, ketaStatus: '해당없음', ccviRequired: false, leadTimeDays: 0, guaranteeLetterRequired: false },
     route: R('FRA', 'Frankfurt', 'LH', 'LH712', 'LH711', 1900, 'EUR', 11),
-    treatyRate: 0, tags: ['GDPR'], memo: '본인 발권 후 정산(영수증 원본 필요).',
+    treatyRate: 0, sponsorship: '부분지원', tags: ['GDPR', '부분지원'],
+    memo: '항공 본인 발권 후 정산(영수증 원본 필요) · 숙박만 주최 부담.',
   }),
   mk({
     n: 7, nameEn: 'Dr. Yuki Tanaka', title: 'Principal Researcher',
@@ -525,7 +661,8 @@ export const speakers: Speaker[] = [
     sessionIds: ['S09'],
     visa: { required: false, track: '면제(무비자)', stage: '해당없음', ketaRequired: false, ketaStatus: '해당없음', ccviRequired: false, leadTimeDays: 0, guaranteeLetterRequired: false },
     route: R('HND', 'Tokyo', 'OZ', 'OZ1085', 'OZ1074', 95000, 'JPY', 2),
-    hotelNights: 2, treatyRate: 0, tags: [], memo: '11/19 오후 입국, 11/20 저녁 출국(단기 체류).',
+    hotelNights: 2, treatyRate: 0, sponsorship: 'Non-Sponsored', tags: ['자비참가'],
+    memo: '소속 기관 예산으로 항공·숙박 자체 부담(Non-Sponsored). 강연료만 지급 대상.',
   }),
   mk({
     n: 8, nameEn: 'Prof. Carlos Ibarra', title: 'Professor of Urban Planning',
@@ -549,7 +686,9 @@ export const speakers: Speaker[] = [
       memo: '여권·재직증명 수령 완료. 금주 중 사증발급인정서 신청 예정.',
     },
     route: R('HAN', 'Hanoi', 'VN', 'VN408', 'VN409', 950, 'USD', 5),
-    tags: ['비자진행', '워크숍'], memo: '워크숍 사전 실습 환경(노트북 40대) 사전 세팅 필요.',
+    ticketNameOverride: 'NGUYEN MAI',
+    tags: ['비자진행', '워크숍'],
+    memo: '워크숍 사전 실습 환경(노트북 40대) 사전 세팅 필요. 항공 예약 시 중간명 누락 확인 요망.',
   }),
   mk({
     n: 10, nameEn: 'Dr. Sarah Whitfield', title: 'Chief Investment Officer',
@@ -560,6 +699,7 @@ export const speakers: Speaker[] = [
     visa: { required: false, track: 'K-ETA', stage: '해당없음', ketaRequired: true, ketaStatus: '승인', ccviRequired: false, leadTimeDays: 3, guaranteeLetterRequired: false },
     route: R('BOS', 'Boston', 'KE', 'KE082', 'KE081', 5200, 'USD', 14),
     accessibility: '휠체어 접근 필요(무대 램프)', treatyRate: 0,
+    companions: [{ name: 'Dana Whitfield', relation: '수행 비서', supported: true, shareRoom: false, passportReceived: true, visaRequired: false, memo: '별도 객실 필요 · 현장 동행' }],
     tags: ['VIP', '기조연설', '접근성'],
     memo: '한-미 조세조약 독립적 인적용역 면제 — 거주자증명서 수령 완료. 무대 램프·전용 대기실 필요.',
   }),
@@ -577,6 +717,7 @@ export const speakers: Speaker[] = [
       memo: '2024년 타 학회 초청 시 사증 거절 이력 — 초청사유서·신원보증서·재정보증 강화 제출.',
     },
     route: R('LOS', 'Lagos', 'ET', 'ET801', 'ET802', 3100, 'USD', 18),
+    attendance: '참석미정',
     tags: ['비자위험', '고위험'], memo: '영사 인터뷰 9/29. 거절 시 온라인 발표 백업 시나리오 준비(사전 녹화).',
   }),
   mk({
@@ -603,7 +744,7 @@ export const speakers: Speaker[] = [
       memo: '복수사증 발급 완료(유효 3개월, 체류 30일).',
     },
     route: R('PEK', 'Beijing', 'CA', 'CA123', 'CA124', 980, 'USD', 2),
-    treatyRate: 15, tags: ['비자완료'], memo: '통역(한↔중) 필요 — 라운드테이블 순차통역 배정.',
+    treatyRate: 15, principal: 'M02', tags: ['비자완료'], memo: '통역(한↔중) 필요 — 라운드테이블 순차통역 배정.',
   }),
   mk({
     n: 14, nameEn: "Dr. Liam O'Connor", title: 'Program Director',

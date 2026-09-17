@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../store'
 import { activeConference, computeRisks, readiness } from '../lib/metrics'
 import { Avatar, Badge, Card, DL, Empty, StatusBadge, TierTag } from '../components/ui'
-import { ddayLabel, flag, fmtDate, fmtDateTime, krw, money, today, toneOf } from '../lib/format'
+import { daysBetween, ddayLabel, flag, fmtDate, fmtDateTime, krw, money, today, toneOf } from '../lib/format'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 import type { DeliverableStatus, PipelineStage, VisaStage } from '../types'
@@ -26,6 +26,8 @@ export function SpeakerDetail({ id }: { id: string }) {
   const myComms = state.communications.filter(c => c.speakerId === sp.id)
   const myLogs = state.auditLogs.filter(l => l.entityId === sp.id)
   const sessions = state.sessions.filter(s => sp.sessionIds.includes(s.id))
+  // 입국 시 여권 잔여 유효기간 6개월(180일) 이상 권고 — 행사 종료일 기준으로 판정한다.
+  const passportOk = !!sp.passport?.expiryDate && daysBetween(conf.endDate, sp.passport.expiryDate) >= 180
 
   return (
     <>
@@ -170,8 +172,8 @@ export function SpeakerDetail({ id }: { id: string }) {
                 ['국적', sp.passport.nationality], ['발급일', fmtDate(sp.passport.issueDate)],
                 ['만료일', <>
                   {fmtDate(sp.passport.expiryDate)}{' '}
-                  <Badge tone={sp.passport.expiryDate && sp.passport.expiryDate > '2027-05-20' ? 'good' : 'serious'}>
-                    {sp.passport.expiryDate && sp.passport.expiryDate > '2027-05-20' ? '유효기간 충분' : '6개월 규정 확인'}
+                  <Badge tone={passportOk ? 'good' : 'serious'}>
+                    {passportOk ? '6개월 규정 충족' : '6개월 규정 미달 — 갱신 필요'}
                   </Badge>
                 </>],
                 ['사본 수령', sp.passport.scanReceived ? '수령 완료' : '미수령'],

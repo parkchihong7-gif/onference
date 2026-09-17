@@ -111,6 +111,15 @@ export const PIPELINE_ORDER: PipelineStage[] = [
 
 export type SpeakerTier = 'Keynote' | 'Invited' | 'Panel' | 'Moderator' | 'Chair' | 'Workshop'
 
+/** 참석 확정 상태 — 초청 수락과 별개로 "실제 참석" 여부를 따로 관리한다 */
+export type AttendanceStatus = '참석확정' | '참석미정' | '불참' | '취소'
+
+/** 비용 지원 구분 — 자비 참가(Non-Sponsored) 연사를 구분해 정산 대상에서 제외한다 */
+export type Sponsorship = 'Sponsored' | '부분지원' | 'Non-Sponsored'
+
+/** 예약 상태 공통 코드 (항공·숙박·의전·이동·프로그램) */
+export type BookingStatus = '미정' | '요청' | '가예약' | '확정' | '변경요청' | '취소'
+
 /** 지원 패키지(초기 세팅 템플릿) — 등급별 지원 범위를 템플릿으로 고정 */
 export interface SupportPackage {
   id: ID
@@ -192,14 +201,24 @@ export interface Flight {
   direction: '입국' | '출국'
   carrier: string
   flightNo: string
-  from: string
+  from: string          // IATA
+  fromCity: string
   to: string
+  toCity: string
   departAt: ISODateTime
   arriveAt: ISODateTime
-  cabin: string
+  boardingTime?: string       // 탑승 시각 (현지)
+  cabin: string               // Cabin Class (Business / Economy ...)
+  bookingClass?: string       // 예약 등급 코드 (BZ200 등)
+  seat?: string
+  terminal?: string
+  gate?: string
+  passengerName?: string      // 탑승자 영문명 — 여권 영문명과 일치해야 함
+  passportNumber?: string
   pnr?: string
   ticketedBy: '주최발권' | '본인구매후정산'
   eTicketReceived: boolean
+  status: BookingStatus
   fare: number
   currency: Currency
   baggage?: string
@@ -210,11 +229,19 @@ export interface HotelBooking {
   hotel: string
   address?: string
   checkIn: ISODate
+  checkInTime?: string
   checkOut: ISODate
+  checkOutTime?: string
   nights: number
+  roomNumber?: string
   roomType: string
+  bedType?: string
+  guests: number
+  breakfastIncluded: boolean
+  specialMeal?: string          // 알러지·종교식 등
   billing: '주최일괄(Master Bill)' | '본인결제후정산'
   confirmationNo?: string
+  status: BookingStatus
   ratePerNight: number
   currency: Currency
   requests?: string
@@ -231,7 +258,37 @@ export interface Transfer {
   driverPhone?: string
   meetingPoint?: string
   assignedMemberId?: ID
-  status: '예정' | '확정' | '완료' | '취소'
+  status: BookingStatus | '완료'
+  flightNo?: string
+  memo?: string
+}
+
+/** 의전(Protocol) — 영접·의전 서열·라운지·기념품 */
+export interface Protocol {
+  level: 'VVIP' | 'VIP' | '일반'
+  greeterMemberId?: ID          // 영접 담당
+  greetingPoint?: string        // 영접 위치(공항 게이트·호텔 로비)
+  loungeAccess: boolean
+  seatingOrder?: number         // 갈라디너 의전 서열
+  giftPrepared: boolean
+  photoSession: boolean
+  escortVehicle?: string
+  status: BookingStatus
+  note?: string
+}
+
+/** 프로그램 등록(Program Registration) — 세션·만찬·투어 등 참가 등록 */
+export interface ProgramRegistration {
+  id: ID
+  name: string
+  type: '세션발표' | '좌장' | '만찬' | '리셉션' | '투어' | '워크숍' | '기자간담회'
+  sessionId?: ID
+  date: ISODate
+  time?: string
+  place?: string
+  status: '등록' | '미등록' | '대기' | '불참'
+  seat?: string
+  note?: string
 }
 
 /* ────────────────────────────── 제출물 / 동의 ────────────────────────── */
@@ -322,8 +379,15 @@ export interface Companion {
   id: ID
   name: string
   relation: string
+  nationality?: string
+  attendance: AttendanceStatus
   visaRequired: boolean
-  supported: boolean
+  visaStage?: VisaStage
+  passportReceived: boolean
+  supported: boolean            // 주최 비용 지원 여부
+  shareRoom: boolean            // 객실 공유
+  ownFlight: boolean            // 별도 항공 발권
+  programIds?: ID[]             // 동반 참석 프로그램
   memo?: string
 }
 
@@ -353,12 +417,18 @@ export interface Speaker {
   /* 초청 조건 */
   tier: SpeakerTier
   stage: PipelineStage
+  /** 실제 참석 확정 여부 (초청 수락과 별도 관리) */
+  attendance: AttendanceStatus
+  /** 비용 지원 구분 — Non-Sponsored 는 정산 집계에서 제외 */
+  sponsorship: Sponsorship
   priority: '상' | '중' | '하'
   attendanceMode: DeliveryMode
   recommendedBy?: string
   previousParticipation?: string
   supportPackageId: ID
   liaisonMemberId: ID
+  /** Principal — 초청 책임자(사무국 측 승인·의사결정권자) */
+  principalMemberId: ID
   sessionIds: ID[]
 
   firstContactAt?: ISODate
@@ -381,6 +451,10 @@ export interface Speaker {
   flights: Flight[]
   hotel?: HotelBooking
   transfers: Transfer[]
+  protocol: Protocol
+  programs: ProgramRegistration[]
+  /** 지원 패키지상 숙박 지원 한도(박) — 실제 예약 박수와 비교해 초과분을 검증한다 */
+  supportedNights: number
   deliverables: Deliverable[]
   settlement: Settlement
   onsite: OnsiteStatus

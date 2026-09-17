@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from 'react
 import type { ReactNode } from 'react'
 import type { AppState, AuditLog, Communication, Deliverable, PipelineStage, Speaker, Task, VisaStage } from './types'
 import { initialState } from './data/seed'
+import { today } from './lib/format'
 
 const STORAGE_KEY = 'onference.state.v1'
 
@@ -17,7 +18,9 @@ export type Action =
   | { type: 'ADD_COMM'; comm: Communication }
   | { type: 'RESET' }
 
+/** 감사 로그 시각은 실제 시각, 업무 일자는 데모 기준일(today())을 사용한다 */
 const now = () => new Date().toISOString().slice(0, 16)
+const bizDate = () => today()
 
 function log(state: AppState, entry: Omit<AuditLog, 'id' | 'at' | 'actor'>): AuditLog {
   const actor = state.members.find(m => m.id === state.currentUserId)?.name ?? '시스템'
@@ -40,7 +43,7 @@ function reducer(state: AppState, action: Action): AppState {
         : state.auditLogs
       return {
         ...state,
-        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, ...action.patch, updatedAt: now().slice(0, 10) } : s)),
+        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, ...action.patch, updatedAt: bizDate() } : s)),
         auditLogs: logs,
       }
     }
@@ -49,12 +52,12 @@ function reducer(state: AppState, action: Action): AppState {
       const sp = state.speakers.find(s => s.id === action.id)
       if (!sp || sp.stage === action.stage) return state
       const patch: Partial<Speaker> = { stage: action.stage }
-      if (action.stage === '수락' && !sp.acceptedAt) patch.acceptedAt = now().slice(0, 10)
-      if (action.stage === '계약완료') { patch.agreementStatus = '서명완료'; patch.agreementSignedAt = now().slice(0, 10) }
-      if (action.stage === '거절') patch.declinedAt = now().slice(0, 10)
+      if (action.stage === '수락' && !sp.acceptedAt) patch.acceptedAt = bizDate()
+      if (action.stage === '계약완료') { patch.agreementStatus = '서명완료'; patch.agreementSignedAt = bizDate() }
+      if (action.stage === '거절') patch.declinedAt = bizDate()
       return {
         ...state,
-        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, ...patch, updatedAt: now().slice(0, 10) } : s)),
+        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, ...patch, updatedAt: bizDate() } : s)),
         auditLogs: [log(state, { action: '단계변경', entityType: '연사', entityId: sp.id, entityLabel: sp.nameEn, field: '파이프라인 단계', before: sp.stage, after: action.stage }), ...state.auditLogs],
       }
     }
@@ -63,10 +66,10 @@ function reducer(state: AppState, action: Action): AppState {
       const sp = state.speakers.find(s => s.id === action.id)
       if (!sp) return state
       const visa = { ...sp.visa, stage: action.stage }
-      if (action.stage === '발급완료' && !visa.issuedAt) visa.issuedAt = now().slice(0, 10)
+      if (action.stage === '발급완료' && !visa.issuedAt) visa.issuedAt = bizDate()
       return {
         ...state,
-        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, visa, updatedAt: now().slice(0, 10) } : s)),
+        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, visa, updatedAt: bizDate() } : s)),
         auditLogs: [log(state, { action: '수정', entityType: '비자', entityId: sp.id, entityLabel: sp.nameEn, field: '비자 단계', before: sp.visa.stage, after: action.stage }), ...state.auditLogs],
       }
     }

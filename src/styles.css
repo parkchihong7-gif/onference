@@ -291,3 +291,73 @@ table.data tr.clickable { cursor: pointer; }
   .print-only { display: block; }
   .card { break-inside: avoid; box-shadow: none; }
 }
+
+/* ─────────────────────── 초청자 워크스페이스 (마스터-디테일) ─────────────────────── */
+.ws { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1100px) { .ws { grid-template-columns: 1fr; } }
+
+.ws-list {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: calc(100vh - 150px);
+}
+.ws-list-head { padding: 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.ws-list-body { overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+.ws-card {
+  border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; cursor: pointer;
+  background: var(--surface); display: flex; flex-direction: column; gap: 6px;
+}
+.ws-card:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.ws-card[aria-selected='true'] {
+  border-color: var(--seq-450); background: var(--info-bg);
+  box-shadow: inset 3px 0 0 var(--seq-550);
+}
+.ws-card-name { font-weight: 660; font-size: 13.5px; display: flex; align-items: center; gap: 6px; }
+.ws-card-meta { font-size: 11.5px; color: var(--ink-2); line-height: 1.45; }
+.ws-card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ws-accompany {
+  border: 1px dashed var(--line-strong); border-radius: 7px; padding: 5px 8px; font-size: 11.5px;
+  color: var(--ink-2); background: transparent; cursor: pointer; width: 100%; text-align: center;
+}
+.ws-accompany:hover { background: var(--surface-2); color: var(--ink); }
+
+.ws-detail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ws-head {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 16px;
+}
+.ws-subtabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ws-subtab {
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2);
+  border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer;
+}
+.ws-subtab[aria-pressed='true'] { background: var(--seq-550); border-color: var(--seq-550); color: #fff; font-weight: 600; }
+
+/* 예약 상세 카드 (레퍼런스: Flight / Accommodation 카드) */
+.bk {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden;
+}
+.bk-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line);
+  font-size: 12.5px; font-weight: 650;
+}
+.bk-body { padding: 12px; }
+.bk-grid { display: grid; gap: 12px 18px; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.bk-f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bk-label { font-size: 10.5px; color: var(--ink-3); letter-spacing: .01em; }
+.bk-value { font-size: 13px; font-weight: 600; word-break: break-word; }
+.bk-value-lg { font-size: 19px; font-weight: 720; letter-spacing: -.01em; line-height: 1.15; }
+.bk-sub { font-size: 11px; color: var(--ink-3); }
+.bk-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 900px) { .bk-split { grid-template-columns: 1fr; } }
+.bk-route { display: flex; align-items: center; gap: 10px; }
+.bk-arrow { color: var(--ink-3); font-size: 16px; }
+
+.issue { display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; }
+.issue-오류 { background: var(--critical-bg); color: #8f2626; }
+.issue-경고 { background: var(--warning-bg); color: #7a5500; }
+.issue-확인 { background: var(--info-bg); color: var(--seq-550); }
+:root[data-theme='dark'] .issue-오류 { color: #f08585; }
+:root[data-theme='dark'] .issue-경고 { color: #fac95f; }
+:root[data-theme='dark'] .issue-확인 { color: #7fb4f2; }

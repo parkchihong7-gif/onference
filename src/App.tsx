@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useApp } from './store'
 import { go, useRoute } from './lib/router'
-import { activeConference, computeRisks, kpis, speakersOf, tasksOf } from './lib/metrics'
+import { activeConference, computeRisks, kpis, speakersOf, tasksOf, validateAll } from './lib/metrics'
 import { ddayLabel, today } from './lib/format'
 import { Dashboard } from './pages/Dashboard'
 import { Pipeline } from './pages/Pipeline'
+import { Workspace } from './pages/Workspace'
 import { Speakers } from './pages/Speakers'
 import { SpeakerDetail } from './pages/SpeakerDetail'
 import { Sessions } from './pages/Sessions'
@@ -20,12 +21,13 @@ import { Settings } from './pages/Settings'
 import { Risks } from './pages/Risks'
 
 interface NavDef { key: string; label: string; icon: string; group: string; count?: (n: Counts) => number | undefined }
-interface Counts { speakers: number; risks: number; tasks: number; visa: number; comms: number }
+interface Counts { speakers: number; risks: number; tasks: number; visa: number; comms: number; issues: number }
 
 const NAV: NavDef[] = [
   { key: 'dashboard', label: '대시보드', icon: '◎', group: '현황' },
   { key: 'risks', label: '리스크·경보', icon: '⚠', group: '현황', count: c => c.risks || undefined },
   { key: 'pipeline', label: '초청 파이프라인', icon: '⇉', group: '초청 관리' },
+  { key: 'workspace', label: '초청자 워크스페이스', icon: '▦', group: '초청 관리', count: c => c.issues || undefined },
   { key: 'speakers', label: '연사·초청자', icon: '☰', group: '초청 관리', count: c => c.speakers },
   { key: 'sessions', label: '세션·프로그램', icon: '▤', group: '초청 관리' },
   { key: 'visa', label: '출입국·비자', icon: '🛂', group: '실무 진행', count: c => c.visa || undefined },
@@ -53,6 +55,7 @@ export function App() {
     tasks: tasksOf(state).filter(t => t.status !== '완료' && t.dueDate < today()).length,
     visa: speakersOf(state).filter(s => s.visa.required && s.visa.stage !== '발급완료' && s.stage !== '거절').length,
     comms: 0,
+    issues: validateAll(state).reduce((a, x) => a + x.issues.filter(i => i.level === '오류').length, 0),
   }
 
   const toggleTheme = () => {
@@ -124,6 +127,7 @@ export function App() {
           {route.page === 'dashboard' && <Dashboard />}
           {route.page === 'risks' && <Risks />}
           {route.page === 'pipeline' && <Pipeline />}
+          {route.page === 'workspace' && <Workspace />}
           {route.page === 'speakers' && (route.id ? <SpeakerDetail id={route.id} /> : <Speakers />)}
           {route.page === 'sessions' && <Sessions />}
           {route.page === 'visa' && <Visa />}

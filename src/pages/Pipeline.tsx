@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../store'
 import { speakersOf } from '../lib/metrics'
 import { Badge, Card, TierTag } from '../components/ui'
-import { ddayLabel, flag, fmtDate, krwShort } from '../lib/format'
+import { ddayLabel, flag, fmtDate, krwShort, today } from '../lib/format'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 import type { PipelineStage } from '../types'
@@ -46,7 +46,7 @@ export function Pipeline() {
                 <span className="chip num">{cards.length}</span>
               </div>
               {cards.map(s => {
-                const overdue = s.stage === '공식초청' && s.replyDueAt && s.replyDueAt < state.speakers[0].updatedAt
+                const overdue = s.stage === '공식초청' && !!s.replyDueAt && s.replyDueAt < today()
                 return (
                   <div key={s.id} className="kanban-card" draggable
                     onDragStart={() => setDragId(s.id)}

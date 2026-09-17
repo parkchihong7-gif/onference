@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../store'
 import { Badge, Card, StatTile } from '../components/ui'
+import { auditOf } from '../lib/metrics'
 import { fmtDateTime } from '../lib/format'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
@@ -10,13 +11,15 @@ export function Audit() {
   const [type, setType] = useState('전체')
   const [actor, setActor] = useState('전체')
   const [q, setQ] = useState('')
+  const [scoped, setScoped] = useState(true)
+  const source = scoped ? auditOf(state) : state.auditLogs
 
-  const rows = useMemo(() => state.auditLogs.filter(l => {
+  const rows = useMemo(() => source.filter(l => {
     if (type !== '전체' && l.entityType !== type) return false
     if (actor !== '전체' && l.actor !== actor) return false
     if (q && !`${l.entityLabel} ${l.field ?? ''} ${l.before ?? ''} ${l.after ?? ''} ${l.memo ?? ''}`.toLowerCase().includes(q.toLowerCase())) return false
     return true
-  }), [state.auditLogs, type, actor, q])
+  }), [source, type, actor, q])
 
   const actors = [...new Set(state.auditLogs.map(l => l.actor))]
   const types = [...new Set(state.auditLogs.map(l => l.entityType))]
@@ -55,6 +58,9 @@ export function Audit() {
           <select className="select" value={actor} onChange={e => setActor(e.target.value)}>
             <option>전체</option>{actors.map(a => <option key={a}>{a}</option>)}
           </select>
+          <label className="chip" style={{ cursor: 'pointer' }}>
+            <input type="checkbox" checked={scoped} onChange={e => setScoped(e.target.checked)} /> 현재 행사만
+          </label>
           <span className="spacer" />
           <span className="small muted num">{rows.length}건</span>
         </div>

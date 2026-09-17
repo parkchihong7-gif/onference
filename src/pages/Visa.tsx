@@ -1,7 +1,7 @@
 import { useApp } from '../store'
-import { activeConference, speakersOf } from '../lib/metrics'
+import { activeConference, speakersOf, visaLeadDays, visaSlack } from '../lib/metrics'
 import { Badge, Card, StatTile, StatusBadge } from '../components/ui'
-import { dday, flag, fmtDate, fmtDateTime } from '../lib/format'
+import { flag, fmtDate, fmtDateTime } from '../lib/format'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 import type { VisaStage } from '../types'
@@ -15,8 +15,8 @@ export function Visa() {
   const visaCases = list.filter(s => s.visa.required)
   const waiver = list.filter(s => !s.visa.required && s.attendanceMode !== '온라인')
 
-  const need = (s: typeof list[number]) => s.visa.leadTimeDays + (s.visa.ccviRequired ? 20 : 0) + 7
-  const slack = (s: typeof list[number]) => dday(conf.startDate) - need(s)
+  const need = (s: typeof list[number]) => visaLeadDays(s)
+  const slack = (s: typeof list[number]) => visaSlack(s, conf)
 
   const exportCsv = () => downloadCsv(`${conf.code}_비자진행현황.csv`, [
     ['연사', '국적', '사증종류', '단계', '인정서', '공관', '예약일시', '접수일', '발급일', '예상소요(일)', '여유(일)'],
@@ -43,7 +43,7 @@ export function Visa() {
           bar={(visaCases.filter(s => s.visa.stage === '발급완료').length / Math.max(visaCases.length, 1)) * 100} />
         <StatTile label="사증발급인정서 대상" value={visaCases.filter(s => s.visa.ccviRequired).length} unit="명"
           foot="법무부 심사 약 2~3주 소요" tone="info" />
-        <StatTile label="일정 여유 2주 미만" value={visaCases.filter(s => s.visa.stage !== '발급완료' && slack(s) < 14).length} unit="명"
+        <StatTile label="일정 여유 3주 미만" value={visaCases.filter(s => s.visa.stage !== '발급완료' && slack(s) < 21).length} unit="명"
           tone="critical" foot="리드타임 역산 기준 · 즉시 조치 대상" />
       </div>
 
@@ -63,7 +63,7 @@ export function Visa() {
                     <div className="xsmall muted">{s.visa.track}</div>
                     <div className="row-wrap" style={{ gap: 4, marginTop: 5 }}>
                       {s.visa.ccviRequired && <Badge tone="info">인정서</Badge>}
-                      <Badge tone={slack(s) < 0 ? 'critical' : slack(s) < 14 ? 'serious' : 'good'}>여유 {slack(s)}일</Badge>
+                      <Badge tone={slack(s) < 0 ? 'critical' : slack(s) < 21 ? 'serious' : 'good'}>여유 {slack(s)}일</Badge>
                     </div>
                   </div>
                 ))}
@@ -92,7 +92,7 @@ export function Visa() {
                   <td className="small num nowrap">{fmtDate(s.passport?.expiryDate)}</td>
                   <td className="right num">{need(s)}일</td>
                   <td className="right num">
-                    <Badge tone={s.visa.stage === '발급완료' ? 'good' : slack(s) < 0 ? 'critical' : slack(s) < 14 ? 'serious' : 'info'}>
+                    <Badge tone={s.visa.stage === '발급완료' ? 'good' : slack(s) < 0 ? 'critical' : slack(s) < 21 ? 'serious' : 'info'}>
                       {s.visa.stage === '발급완료' ? '완료' : `${slack(s)}일`}
                     </Badge>
                   </td>

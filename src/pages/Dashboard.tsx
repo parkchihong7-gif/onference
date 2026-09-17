@@ -1,7 +1,8 @@
 import { useApp } from '../store'
-import { activeConference, computeRisks, kpis, readiness, speakersOf, tasksOf } from '../lib/metrics'
+import { activeConference, auditOf, computeRisks, kpis, readiness, speakersOf, tasksOf, validateAll } from '../lib/metrics'
 import { Card, Donut, Funnel, Gantt, HBars, StackBar, StatTile, Badge, Progress } from '../components/ui'
 import { ddayLabel, flag, fmtDate, fmtDateTime, krwShort, pct, today } from '../lib/format'
+import { addDays } from '../data/seed'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 
@@ -12,6 +13,16 @@ export function Dashboard() {
   const k = kpis(state)
   const risks = computeRisks(state)
   const tasks = tasksOf(state)
+  const quality = validateAll(state)
+  const qErr = quality.flatMap(x => x.issues).filter(i => i.level === '오류')
+  const attendanceSeg = (['참석확정', '참석미정', '불참', '취소'] as const).map((a, i) => ({
+    label: a, value: list.filter(s => s.attendance === a).length,
+    color: ['var(--s3)', 'var(--s4)', 'var(--s8)', 'var(--surface-3)'][i],
+  }))
+  const sponsorSeg = (['Sponsored', '부분지원', 'Non-Sponsored'] as const).map((a, i) => ({
+    label: a, value: list.filter(s => s.sponsorship === a && s.stage !== '거절').length,
+    color: ['var(--s1)', 'var(--s4)', 'var(--surface-3)'][i],
+  }))
 
   const visaCases = list.filter(s => s.visa.required && s.stage !== '거절')
   const visaDist = [
@@ -47,6 +58,14 @@ export function Dashboard() {
     color: s.tier === 'Keynote' ? 'var(--s7)' : 'var(--s1)',
     note: `${s.flights[0].flightNo} 도착`,
   }))
+
+  // 간트 범위: 가장 이른 입국 ~ 가장 늦은 출국(없으면 행사 전후 여유) — 월 길이에 의존하지 않는다.
+  const ganttStart = ganttRows.length
+    ? [...ganttRows.map(r => r.from), addDays(conf.startDate, -3)].sort()[0]
+    : addDays(conf.startDate, -14)
+  const ganttEnd = ganttRows.length
+    ? [...ganttRows.map(r => r.to), addDays(conf.endDate, 3)].sort().slice(-1)[0]
+    : addDays(conf.endDate, 7)
 
   const budgetPct = pct(k.budgetCommitKRW, k.budgetPlanKRW)
 
@@ -114,9 +133,10 @@ export function Dashboard() {
           <Donut data={visaDist} centerValue={`${k.visaDone}/${k.visaTotal}`} centerLabel="발급 완료" />
         </Card>
         <Card title="국가·지역 분포" sub="초청 진행 중인 연사 기준">
-          <HBars data={byCountry} unit="명" />
+          {byCountry.length ? <HBars data={byCountry} unit="명" /> : <div className="empty">등록된 초청자가 없습니다.</div>}
         </Card>
         <Card title="준비도 하위 연사" sub="수락·계약 완료 연사의 실무 완료율">
+          {!lowReady.length && <div className="empty">수락 완료된 연사가 없습니다.</div>}
           {lowReady.map(({ s, r }) => (
             <div key={s.id} style={{ marginBottom: 10, cursor: 'pointer' }} onClick={() => go('speakers', s.id)}>
               <div className="row small" style={{ justifyContent: 'space-between' }}>
@@ -132,7 +152,7 @@ export function Dashboard() {
       <div className="grid g23">
         <Card title="연사 체류 일정" sub="입국 ~ 출국 기간 (빨간선 = 오늘)">
           {ganttRows.length ? (
-            <Gantt rows={ganttRows} start={conf.startDate.slice(0, 8) + '01'} end={conf.endDate.slice(0, 8) + '30'} todayISO={today()} />
+            <Gantt rows={ganttRows} start={ganttStart} end={ganttEnd} todayISO={today()} />
           ) : <div className="empty">발권 확정된 여정이 없습니다.</div>}
           <div className="legend" style={{ marginTop: 10 }}>
             <span><i style={{ background: 'var(--s7)' }} />기조연사</span>
@@ -142,7 +162,8 @@ export function Dashboard() {
         <Card title="최근 변경 이력" sub="모든 데이터 변경은 자동 기록됩니다"
           right={<button className="btn btn-sm no-print" onClick={() => go('audit')}>전체</button>}>
           <div className="tl">
-            {state.auditLogs.slice(0, 7).map(l => (
+            {!auditOf(state).length && <div className="empty">변경 이력이 없습니다.</div>}
+            {auditOf(state).slice(0, 7).map(l => (
               <div className="tl-item" key={l.id}>
                 <span className="xsmall muted num">{fmtDateTime(l.at).slice(5)}</span>
                 <span className="tl-dot" />
@@ -177,6 +198,43 @@ export function Dashboard() {
           ))}
         </div>
       </Card>
+
+      <div className="grid g2">
+        <Card title="참석 · 지원 구분 현황" sub="초청 수락과 별개로 실제 참석 여부를 따로 관리합니다">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div>
+              <div className="small sec" style={{ marginBottom: 6 }}>참석 상태</div>
+              <StackBar height={12} segments={attendanceSeg} valueFormat={n => `${n}명`} />
+            </div>
+            <div>
+              <div className="small sec" style={{ marginBottom: 6 }}>비용 지원 구분</div>
+              <StackBar height={12} segments={sponsorSeg} valueFormat={n => `${n}명`} />
+            </div>
+            <div className="dl">
+              <dt>동반자</dt><dd>{list.reduce((a, s) => a + s.companions.length, 0)}명 (별도 객실 {list.flatMap(s => s.companions).filter(c => !c.shareRoom).length}건)</dd>
+              <dt>프로그램 등록</dt><dd>{list.flatMap(s => s.programs).filter(p => p.status === '등록').length}건 · 대기 {list.flatMap(s => s.programs).filter(p => p.status === '대기').length}건</dd>
+            </div>
+          </div>
+        </Card>
+        <Card title={`데이터 정합성 ${qErr.length ? `오류 ${qErr.length}건` : '이상 없음'}`}
+          sub="여권명↔항공 탑승자명, 체류↔숙박 기간 등 교차 검증"
+          right={<button className="btn btn-sm no-print" onClick={() => go('risks')}>전체</button>}>
+          {quality.slice(0, 5).map(({ speaker, issues }) => (
+            <div key={speaker.id} style={{ padding: '7px 0', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}
+              onClick={() => go('speakers', speaker.id)}>
+              <div className="row small" style={{ justifyContent: 'space-between' }}>
+                <span className="trunc">{flag(speaker.country)} {speaker.nameEn}</span>
+                <span className="row" style={{ gap: 4 }}>
+                  {issues.some(i => i.level === '오류') && <Badge tone="critical">오류 {issues.filter(i => i.level === '오류').length}</Badge>}
+                  {issues.some(i => i.level !== '오류') && <Badge tone="warning">확인 {issues.filter(i => i.level !== '오류').length}</Badge>}
+                </span>
+              </div>
+              <div className="xsmall muted trunc">{issues[0].field} · {issues[0].message}</div>
+            </div>
+          ))}
+          {!quality.length && <div className="empty">검증 오류가 없습니다.</div>}
+        </Card>
+      </div>
 
       <div className="grid g2">
         <Card title="마일스톤" sub="행사 기준 역산 일정">
