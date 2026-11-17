@@ -2,6 +2,7 @@ import { useApp } from '../store'
 import { activeConference, sessionsOf } from '../lib/metrics'
 import { Badge, Card, StatTile } from '../components/ui'
 import { flag, fmtDate } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 
 export function Sessions() {
@@ -51,7 +52,7 @@ export function Sessions() {
                         const sp = state.speakers.find(x => x.id === id)
                         return sp ? (
                           <span key={id} className="chip" style={{ marginRight: 4, cursor: 'pointer' }} onClick={() => go('speakers', id)}>
-                            {flag(sp.country)} {sp.nameEn.replace(/^(Prof\.|Dr\.)\s/, '')}
+                            {flag(sp.country)} {displayName(sp).replace(/^(Prof\.|Dr\.)\s/, '')}
                           </span>
                         ) : null
                       })}
@@ -70,7 +71,7 @@ export function Sessions() {
           <div className="row-wrap">
             {unassigned.map(s => (
               <span key={s.id} className="chip" style={{ cursor: 'pointer' }} onClick={() => go('speakers', s.id)}>
-                {flag(s.country)} {s.nameEn} · {s.tier}
+                {flag(s.country)} {displayName(s)} · {s.tier}
               </span>
             ))}
           </div>

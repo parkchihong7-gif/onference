@@ -2,6 +2,7 @@ import { useApp } from '../store'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, HBars, StatTile, StackBar } from '../components/ui'
 import { flag, krw, krwShort, pct } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 
@@ -39,8 +40,9 @@ export function Settlement() {
         <div>
           <h1 className="page-title">정산·예산</h1>
           <p className="page-desc">
-            강연료(원천징수·조세조약 반영), 항공·숙박·지상교통 실비, 해외 송금 정보를 연사 단위로 집계합니다.
-            비거주자 강연료는 기본 22%를 원천징수하며, 조세조약 제한세율은 거주자증명서 수령 시 적용합니다.
+            사례비(원천징수 반영)와 교통·숙박 실비, 지급 정보를 연자 단위로 집계합니다.
+            국내 거주자는 소득 구분에 따라 사업소득 3.3% 또는 기타소득 8.8%를, 비거주자는 기본 22%를 원천징수하며
+            조세조약 제한세율은 거주자증명서 수령 시 적용합니다.
           </p>
         </div>
         <button className="btn no-print" onClick={exportCsv}>⬇ 정산 내역 내보내기</button>
@@ -50,7 +52,7 @@ export function Settlement() {
         <StatTile label="초청 예산" value={krwShort(conf.invitationBudgetKRW)} unit="원" foot={`전체 행사 예산 ${krwShort(conf.budgetTotalKRW)}원`} />
         <StatTile label="약정 집행" value={krwShort(committed)} unit="원" bar={pct(committed, conf.invitationBudgetKRW)}
           tone={pct(committed, conf.invitationBudgetKRW) > 95 ? 'critical' : 'info'} foot={`집행률 ${pct(committed, conf.invitationBudgetKRW)}%`} />
-        <StatTile label="강연료 합계" value={krwShort(honorarium)} unit="원" foot={`${list.length}명 · 평균 ${krwShort(Math.round(honorarium / Math.max(list.length, 1)))}원`} />
+        <StatTile label="사례비 합계" value={krwShort(honorarium)} unit="원" foot={`${list.length}명 · 평균 ${krwShort(Math.round(honorarium / Math.max(list.length, 1)))}원`} />
         <StatTile label="원천세 예상" value={krwShort(withholding)} unit="원" foot={`실지급 ${krwShort(honorarium - withholding)}원`} tone="warning" />
         <StatTile label="예산 잔액" value={krwShort(conf.invitationBudgetKRW - committed)} unit="원"
           tone={conf.invitationBudgetKRW - committed < 0 ? 'critical' : 'good'} foot="약정 기준(미발생 포함)" />
@@ -60,7 +62,7 @@ export function Settlement() {
         <Card title="비목별 실비(약정)" sub="단위: 만원">
           <HBars data={byCat} unit="만원" />
         </Card>
-        <Card title="예산 구성" sub="강연료 vs 실비">
+        <Card title="예산 구성" sub="사례비 vs 실비">
           <StackBar height={14} valueFormat={n => `${krwShort(n)}원`} segments={[
             { label: '강연료', value: honorarium, color: 'var(--s1)' },
             { label: '항공', value: expenses.filter(e => e.category === '항공').reduce((a, e) => a + e.amountKRW, 0), color: 'var(--s2)' },
@@ -90,7 +92,7 @@ export function Settlement() {
         <div className="table-wrap">
           <table className="data">
             <thead>
-              <tr><th>연사</th><th>등급</th><th className="right">강연료</th><th className="right">원천징수율</th><th className="right">원천세</th><th className="right">실지급</th>
+              <tr><th>연자</th><th>등급</th><th>소득 구분</th><th className="right">사례비</th><th className="right">원천징수율</th><th className="right">원천세</th><th className="right">실지급</th>
                 <th>조세조약</th><th>증명서</th><th className="right">실비</th><th className="right">총액</th><th>송금 정보</th></tr>
             </thead>
             <tbody>
@@ -99,8 +101,9 @@ export function Settlement() {
                 const exp = s.settlement.expenses.reduce((a, e) => a + e.amountKRW, 0)
                 return (
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
-                    <td>{flag(s.country)} {s.nameEn}</td>
+                    <td>{s.residency === '해외' ? flag(s.country) : '🇰🇷'} {displayName(s)}</td>
                     <td className="small">{s.tier}</td>
+                    <td className="small nowrap">{s.settlement.taxType}</td>
                     <td className="right num">{krw(s.settlement.honorarium)}</td>
                     <td className="right num">{s.settlement.withholdingRate}%</td>
                     <td className="right num">{krw(tax)}</td>
@@ -114,7 +117,7 @@ export function Settlement() {
                 )
               })}
               <tr>
-                <td colSpan={2}><strong>합계</strong></td>
+                <td colSpan={3}><strong>합계</strong></td>
                 <td className="right num"><strong>{krw(honorarium)}</strong></td>
                 <td />
                 <td className="right num"><strong>{krw(withholding)}</strong></td>
@@ -131,7 +134,8 @@ export function Settlement() {
 
       <Card title="정산 실무 체크포인트">
         <ul className="small sec" style={{ paddingLeft: 18, margin: 0, lineHeight: 1.85 }}>
-          <li>비거주자에게 지급하는 강연료는 국내원천소득으로 원천징수 대상이며, 소득 구분(기타소득/사업소득)에 따라 세율이 달라집니다.</li>
+          <li>국내 거주자 강연료는 반복성·사업성 여부에 따라 사업소득(3.3%) 또는 기타소득(8.8%)으로 구분해 원천징수합니다.</li>
+          <li>비거주자에게 지급하는 강연료는 국내원천소득으로 원천징수 대상이며, 소득 구분에 따라 세율이 달라집니다.</li>
           <li>조세조약 제한세율·면제를 적용하려면 지급 전까지 거주자증명서와 제한세율 적용 신청서를 수령해야 합니다.</li>
           <li>항공·숙박을 주최가 직접 결제한 경우와 연사가 선지급 후 정산하는 경우의 증빙 요건이 다릅니다(영수증 원본·카드 전표).</li>
           <li>해외 송금 시 수취인 영문명과 여권 영문명이 일치해야 하며, 불일치 시 반송됩니다.</li>

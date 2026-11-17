@@ -1,6 +1,9 @@
 import { useApp } from '../store'
 import { activeConference } from '../lib/metrics'
 import { Badge, Card, DL, StatTile } from '../components/ui'
+import { CORE_MODULES, DOMESTIC_MODULES, OVERSEAS_MODULES } from '../types'
+import { needsOverseasModules } from '../lib/scope'
+import type { ModuleKey } from '../types'
 import { fmtDate, krw } from '../lib/format'
 
 export function Settings() {
@@ -15,26 +18,62 @@ export function Settings() {
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">행사 설정·템플릿</h1>
+          <h1 className="page-title">행사 설정 · 모듈</h1>
           <p className="page-desc">
-            행사 기본 정보, 등급별 지원 패키지, 체크리스트 템플릿, 권한(역할) 구성을 관리합니다.
-            초기 세팅에서 템플릿을 확정하면 신규 연사 등록 시 업무·제출물·기한이 자동 생성됩니다.
+            행사 성격(국내/국제)과 활성 모듈, 지원 패키지, 체크리스트 템플릿, 권한 구성을 관리합니다.
+            모듈을 끄면 해당 메뉴가 숨겨지고, 켜면 즉시 나타납니다. 초기 세팅에서 템플릿을 확정하면
+            신규 연자 등록 시 업무·제출물·기한이 자동 생성됩니다.
           </p>
         </div>
         <button className="btn no-print" onClick={reset}>↺ 데모 데이터 초기화</button>
       </div>
 
       <div className="grid g4">
-        <StatTile label="등록 행사" value={state.conferences.length} unit="건" foot="진행 중 · 기획 · 종료 포함" />
+        <StatTile label="등록 행사" value={state.conferences.length} unit="건"
+          foot={`국내 ${state.conferences.filter(c => c.scope === '국내').length} · 국제 ${state.conferences.filter(c => c.scope === '국제').length}`} />
         <StatTile label="지원 패키지" value={state.supportPackages.length} unit="종" foot="등급별 지원 범위" />
         <StatTile label="체크리스트 템플릿" value={state.checklistTemplates.reduce((a, t) => a + t.items.length, 0)} unit="항목"
           foot={`${state.checklistTemplates.length}개 템플릿`} />
         <StatTile label="구성원" value={state.members.length} unit="명" foot={`${new Set(state.members.map(m => m.role)).size}개 역할`} />
       </div>
 
+      <Card title="모듈 구성" sub="행사 성격에 따라 기본값이 적용되며, 필요에 따라 켜고 끌 수 있습니다">
+        <div className="grid g3">
+          {([['공통 모듈', CORE_MODULES], ['국내 학회 모듈', DOMESTIC_MODULES], ['해외 연자 모듈 (검증 전)', OVERSEAS_MODULES]] as [string, ModuleKey[]][]).map(([group, keys]) => (
+            <div key={group}>
+              <div className="small sec" style={{ marginBottom: 8, fontWeight: 600 }}>{group}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {keys.map(k => {
+                  const on = conf.modules.includes(k)
+                  const isOverseas = OVERSEAS_MODULES.includes(k)
+                  return (
+                    <label key={k} className="row small" style={{ gap: 8, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={on}
+                        onChange={() => dispatch({ type: 'TOGGLE_MODULE', conferenceId: conf.id, module: k })} />
+                      <span style={{ flex: 1 }}>{k}</span>
+                      {isOverseas && !needsOverseasModules(state) && <span className="chip xsmall">해외 연자 없음</span>}
+                      {isOverseas && <span className="chip xsmall">검증 전</span>}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="alert alert-info" style={{ marginTop: 14 }}>
+          <span aria-hidden>ℹ</span>
+          <span>
+            출입국·사증, 해외송금·조세조약은 <strong>해외에서 오는 연자가 있을 때만</strong> 메뉴에 표시됩니다.
+            국내 학회에 해외 연자 1명이 있어도 동일하게 적용되며, 그 외 과정(섭외·계약·교통·숙박·제출물·현장·정산)은
+            국내 연자와 같은 모듈로 처리됩니다.
+          </span>
+        </div>
+      </Card>
+
       <div className="grid g2">
         <Card title="행사 기본 정보">
           <DL items={[
+            ['행사 성격', <><Badge tone={conf.scope === '국내' ? 'info' : 'neutral'}>{conf.scope}</Badge> <span className="chip">{conf.industry}</span></>],
             ['행사명(국문)', conf.nameKo], ['행사명(영문)', conf.nameEn], ['코드', conf.code],
             ['기간', `${fmtDate(conf.startDate)} ~ ${fmtDate(conf.endDate)}`],
             ['장소', `${conf.venue} · ${conf.city}, ${conf.country}`],
@@ -45,6 +84,8 @@ export function Settings() {
             ['트랙', conf.tracks.join(' · ')],
             ['예상 참가', `${conf.expectedAttendees.toLocaleString()}명`],
             ['총 예산 / 초청 예산', `${krw(conf.budgetTotalKRW)} / ${krw(conf.invitationBudgetKRW)}`],
+            ['연수평점 기관', conf.creditAuthority ?? '해당 없음'],
+            ['활성 모듈', `${conf.modules.length}개`],
             ['상태', <Badge tone="info">{conf.status}</Badge>],
           ]} />
         </Card>

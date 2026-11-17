@@ -3,12 +3,13 @@ import { useApp } from '../store'
 import { activeConference, sessionsOf, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatTile } from '../components/ui'
 import { flag, fmtDate, fmtDateTime } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import type { Speaker } from '../types'
 
 type Step = keyof Pick<Speaker['onsite'], 'arrivedAirportAt' | 'hotelCheckedInAt' | 'venueCheckInAt' | 'presentedAt' | 'departedAt'>
 const STEPS: { key: Step; label: string }[] = [
-  { key: 'arrivedAirportAt', label: '공항 도착' },
+  { key: 'arrivedAirportAt', label: '도착(공항/역)' },
   { key: 'hotelCheckedInAt', label: '호텔 체크인' },
   { key: 'venueCheckInAt', label: '현장 체크인' },
   { key: 'presentedAt', label: '발표 완료' },
@@ -64,7 +65,7 @@ export function Onsite() {
             <tbody>
               {onsiteList.map(s => (
                 <tr key={s.id}>
-                  <td className="clickable" onClick={() => go('speakers', s.id)}>{flag(s.country)} <strong>{s.nameEn}</strong>
+                  <td className="clickable" onClick={() => go('speakers', s.id)}>{flag(s.country)} <strong>{displayName(s)}</strong>
                     <div className="xsmall muted">{state.members.find(m => m.id === s.liaisonMemberId)?.name} 담당</div>
                   </td>
                   <td className="small">{s.tier}</td>
@@ -113,7 +114,7 @@ export function Onsite() {
                       if (!sp) return null
                       return (
                         <span key={id} className="chip" style={{ marginRight: 4, cursor: 'pointer' }} onClick={() => go('speakers', id)}>
-                          {flag(sp.country)} {sp.nameEn.replace(/^(Prof\.|Dr\.)\s/, '')}
+                          {flag(sp.country)} {displayName(sp).replace(/^(Prof\.|Dr\.)\s/, '')}
                           {sp.attendanceMode === '온라인' ? ' (온라인)' : ''}
                         </span>
                       )
@@ -150,7 +151,7 @@ export function Onsite() {
           {list.filter(s => s.attendanceMode === '온라인').map(s => (
             <div key={s.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
               <div className="row" style={{ gap: 8 }}>
-                <strong className="small">{flag(s.country)} {s.nameEn}</strong>
+                <strong className="small">{flag(s.country)} {displayName(s)}</strong>
                 <Badge tone="info">{s.timezone}</Badge>
               </div>
               <div className="xsmall muted">{s.memo}</div>

@@ -2,6 +2,7 @@ import { useApp } from '../store'
 import { activeConference, auditOf, computeRisks, kpis, readiness, speakersOf, tasksOf, validateAll } from '../lib/metrics'
 import { Card, Donut, Funnel, Gantt, HBars, StackBar, StatTile, Badge, Progress } from '../components/ui'
 import { ddayLabel, flag, fmtDate, fmtDateTime, krwShort, pct, today } from '../lib/format'
+import { displayName, hasModule, labelsOf, overseasSpeakers } from '../lib/scope'
 import { addDays } from '../data/seed'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
@@ -13,6 +14,12 @@ export function Dashboard() {
   const k = kpis(state)
   const risks = computeRisks(state)
   const tasks = tasksOf(state)
+  const labels = labelsOf(conf)
+  const overseas = overseasSpeakers(state)
+  const regs = state.registrations.filter(r => r.conferenceId === conf.id)
+  const abs = state.abstracts.filter(a => a.conferenceId === conf.id)
+  const spons = state.sponsors.filter(x => x.conferenceId === conf.id)
+  const credits = state.creditPrograms.filter(c => c.conferenceId === conf.id)
   const quality = validateAll(state)
   const qErr = quality.flatMap(x => x.issues).filter(i => i.level === '오류')
   const attendanceSeg = (['참석확정', '참석미정', '불참', '취소'] as const).map((a, i) => ({
@@ -52,7 +59,7 @@ export function Dashboard() {
     .map(s => ({ s, r: readiness(s) })).sort((a, b) => a.r.score - b.r.score).slice(0, 6)
 
   const ganttRows = list.filter(s => s.flights.length).slice(0, 8).map(s => ({
-    label: `${flag(s.country)} ${s.nameEn.replace(/^(Prof\.|Dr\.)\s/, '')}`,
+    label: `${s.residency === '해외' ? flag(s.country) : '🇰🇷'} ${displayName(s).replace(/^(Prof\.|Dr\.)\s/, '')}`,
     from: s.flights[0].arriveAt.slice(0, 10),
     to: s.flights[1]?.departAt.slice(0, 10) ?? conf.endDate,
     color: s.tier === 'Keynote' ? 'var(--s7)' : 'var(--s1)',
@@ -86,15 +93,24 @@ export function Dashboard() {
       </div>
 
       <div className="grid g5">
-        <StatTile label="확정 연사" value={k.confirmed} unit="명"
-          foot={`초청 발송 ${k.invited}명 · ${k.countries}개국 · 온라인 ${k.onlineCount}명`} bar={pct(k.confirmed, k.invited)} tone="good" />
-        <StatTile label="초청 수락률" value={k.acceptRate} unit="%"
+        <StatTile label={`확정 ${labels.speaker}`} value={k.confirmed} unit="명"
+          foot={`${labels.invite} 발송 ${k.invited}명 · 해외 ${overseas.length}명 · 온라인 ${k.onlineCount}명`} bar={pct(k.confirmed, k.invited)} tone="good" />
+        <StatTile label={`${labels.invite} 수락률`} value={k.acceptRate} unit="%"
           foot={`응답 완료 기준 · 거절 ${list.filter(s => s.stage === '거절').length}명`} bar={k.acceptRate} tone="info" />
-        <StatTile label="비자 발급 완료" value={`${k.visaDone}/${k.visaTotal}`}
-          foot={`비자 필요 ${k.visaTotal}명 · 사증발급인정서 대상 ${visaCases.filter(s => s.visa.ccviRequired).length}명`}
-          bar={pct(k.visaDone, k.visaTotal)} tone={k.visaDone < k.visaTotal ? 'warning' : 'good'} />
-        <StatTile label="항공 발권" value={`${k.flightsTicketed}/${k.flightsNeeded}`}
-          foot="요금 보장 마감 D-60 기준" bar={pct(k.flightsTicketed, k.flightsNeeded)}
+        {k.visaTotal > 0 ? (
+          <StatTile label="사증 발급 완료" value={`${k.visaDone}/${k.visaTotal}`}
+            foot={`해외 연자 ${overseas.length}명 · 사증 필요 ${k.visaTotal}명`}
+            bar={pct(k.visaDone, k.visaTotal)} tone={k.visaDone < k.visaTotal ? 'warning' : 'good'} />
+        ) : hasModule(conf, '참가등록') ? (
+          <StatTile label="사전 등록" value={regs.filter(r => r.channel === '사전등록').length} unit="명"
+            foot={`목표 ${Math.round(conf.expectedAttendees * 0.75)}명 · 수납률 ${pct(regs.filter(r => r.paid).length, regs.length)}%`}
+            bar={pct(regs.length, Math.round(conf.expectedAttendees * 0.75))} tone="info" />
+        ) : (
+          <StatTile label="제출물 검수" value={`${k.docDone}/${k.docTotal}`} bar={pct(k.docDone, k.docTotal)} tone="info" foot="연자 제출 서류" />
+        )}
+        <StatTile label="교통 확정" value={`${k.flightsTicketed}/${k.flightsNeeded}`}
+          foot={overseas.length > 0 ? '국제선 요금 보장 마감 D-60 기준' : 'KTX·국내선·자가용 포함'}
+          bar={pct(k.flightsTicketed, k.flightsNeeded)}
           tone={k.flightsTicketed < k.flightsNeeded ? 'serious' : 'good'} />
         <StatTile label="초청 예산 집행(약정)" value={krwShort(k.budgetCommitKRW)} unit="원"
           foot={`계획 ${krwShort(k.budgetPlanKRW)}원 · 집행률 ${budgetPct}%`} bar={budgetPct}
@@ -129,9 +145,20 @@ export function Dashboard() {
       </div>
 
       <div className="grid g3">
-        <Card title="비자·출입국 진행" sub={`비자 필요 ${visaCases.length}명 / 무비자·K-ETA ${list.filter(s => !s.visa.required && s.stage !== '거절').length}명`}>
-          <Donut data={visaDist} centerValue={`${k.visaDone}/${k.visaTotal}`} centerLabel="발급 완료" />
-        </Card>
+        {k.visaTotal > 0 ? (
+          <Card title="사증·출입국 진행" sub={`해외 연자 ${overseas.length}명 중 사증 필요 ${visaCases.length}명`}>
+            <Donut data={visaDist} centerValue={`${k.visaDone}/${k.visaTotal}`} centerLabel="발급 완료" />
+          </Card>
+        ) : (
+          <Card title="제출물 진행" sub="연자 제출 서류 검수 현황">
+            <Donut centerValue={`${k.docDone}/${k.docTotal}`} centerLabel="검수 완료" data={[
+              { label: '검수완료', value: k.docDone, color: 'var(--s3)' },
+              { label: '제출(검수 전)', value: list.flatMap(s => s.deliverables).filter(d => d.status === '제출').length, color: 'var(--s1)' },
+              { label: '요청함', value: list.flatMap(s => s.deliverables).filter(d => d.status === '요청함').length, color: 'var(--s4)' },
+              { label: '미요청·기한초과', value: list.flatMap(s => s.deliverables).filter(d => ['요청전', '기한초과'].includes(d.status)).length, color: 'var(--s8)' },
+            ]} />
+          </Card>
+        )}
         <Card title="국가·지역 분포" sub="초청 진행 중인 연사 기준">
           {byCountry.length ? <HBars data={byCountry} unit="명" /> : <div className="empty">등록된 초청자가 없습니다.</div>}
         </Card>
@@ -140,7 +167,7 @@ export function Dashboard() {
           {lowReady.map(({ s, r }) => (
             <div key={s.id} style={{ marginBottom: 10, cursor: 'pointer' }} onClick={() => go('speakers', s.id)}>
               <div className="row small" style={{ justifyContent: 'space-between' }}>
-                <span className="trunc">{flag(s.country)} {s.nameEn}</span>
+                <span className="trunc">{flag(s.country)} {displayName(s)}</span>
                 <span className="num">{r.score}%</span>
               </div>
               <div className="bar"><span style={{ width: `${r.score}%`, background: r.score < 50 ? 'var(--critical)' : r.score < 80 ? 'var(--warning)' : 'var(--good)' }} /></div>
@@ -150,7 +177,7 @@ export function Dashboard() {
       </div>
 
       <div className="grid g23">
-        <Card title="연사 체류 일정" sub="입국 ~ 출국 기간 (빨간선 = 오늘)">
+        <Card title="연자 체류 일정" sub="입국 ~ 출국 기간 (빨간선 = 오늘)">
           {ganttRows.length ? (
             <Gantt rows={ganttRows} start={ganttStart} end={ganttEnd} todayISO={today()} />
           ) : <div className="empty">발권 확정된 여정이 없습니다.</div>}
@@ -199,6 +226,53 @@ export function Dashboard() {
         </div>
       </Card>
 
+      {(hasModule(conf, '참가등록') || hasModule(conf, '초록심사') || hasModule(conf, '연수평점') || hasModule(conf, '후원·전시')) && (
+        <div className="grid g4">
+          {hasModule(conf, '참가등록') && (
+            <Card title="참가 등록" sub={`목표 ${Math.round(conf.expectedAttendees * 0.75)}명`}
+              right={<button className="btn btn-sm no-print" onClick={() => go('registrations')}>열기</button>}>
+              <div className="stat">
+                <div className="stat-value">{regs.length}<span className="stat-unit">명</span></div>
+                <div className="bar"><span style={{ width: `${Math.min(100, pct(regs.length, Math.round(conf.expectedAttendees * 0.75)))}%` }} /></div>
+                <div className="stat-foot">사전 {regs.filter(r => r.channel === '사전등록').length} · 미납 {regs.filter(r => !r.paid && r.fee > 0).length}건</div>
+              </div>
+            </Card>
+          )}
+          {hasModule(conf, '초록심사') && (
+            <Card title="초록 심사" sub={`채택률 ${pct(abs.filter(a => a.status === '채택').length, abs.length)}%`}
+              right={<button className="btn btn-sm no-print" onClick={() => go('abstracts')}>열기</button>}>
+              <div className="stat">
+                <div className="stat-value">{abs.filter(a => a.status === '채택').length}<span className="stat-unit">/{abs.length}편</span></div>
+                <div className="bar"><span style={{ width: `${pct(abs.filter(a => a.status === '채택').length, abs.length)}%`, background: 'var(--s3)' }} /></div>
+                <div className="stat-foot">심사 미완 {abs.filter(a => ['심사중', '수정요청'].includes(a.status)).length}편</div>
+              </div>
+            </Card>
+          )}
+          {hasModule(conf, '연수평점') && (
+            <Card title="연수평점" sub={conf.creditAuthority}
+              right={<button className="btn btn-sm no-print" onClick={() => go('credits')}>열기</button>}>
+              <div className="stat">
+                <div className="stat-value">{credits.filter(c => c.status === '승인').reduce((a, c) => a + (c.approvedCredits ?? 0), 0)}<span className="stat-unit">평점</span></div>
+                <div className="stat-foot">
+                  심사 중 {credits.filter(c => ['신청', '심사중'].includes(c.status)).length}건 ·
+                  면허번호 누락 {regs.filter(r => !r.licenseNo && !['학생', '스태프', '후원사'].includes(r.type)).length}명
+                </div>
+              </div>
+            </Card>
+          )}
+          {hasModule(conf, '후원·전시') && (
+            <Card title="후원·전시" sub={`${spons.length}개사`}
+              right={<button className="btn btn-sm no-print" onClick={() => go('sponsors')}>열기</button>}>
+              <div className="stat">
+                <div className="stat-value">{krwShort(spons.filter(x => x.contractStatus === '입금완료').reduce((a, x) => a + x.amount, 0))}<span className="stat-unit">원</span></div>
+                <div className="bar"><span style={{ width: `${pct(spons.filter(x => x.contractStatus === '입금완료').reduce((a, x) => a + x.amount, 0), spons.reduce((a, x) => a + x.amount, 0))}%`, background: 'var(--s3)' }} /></div>
+                <div className="stat-foot">미계약 {spons.filter(x => ['제안', '협의'].includes(x.contractStatus)).length}건</div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
       <div className="grid g2">
         <Card title="참석 · 지원 구분 현황" sub="초청 수락과 별개로 실제 참석 여부를 따로 관리합니다">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -216,14 +290,14 @@ export function Dashboard() {
             </div>
           </div>
         </Card>
-        <Card title={`데이터 정합성 ${qErr.length ? `오류 ${qErr.length}건` : '이상 없음'}`}
+        <Card title={`데이터 정합성 ${qErr.length ? `오류 ${qErr.length}건` : quality.length ? `확인 ${quality.flatMap(x => x.issues).length}건` : '이상 없음'}`}
           sub="여권명↔항공 탑승자명, 체류↔숙박 기간 등 교차 검증"
           right={<button className="btn btn-sm no-print" onClick={() => go('risks')}>전체</button>}>
           {quality.slice(0, 5).map(({ speaker, issues }) => (
             <div key={speaker.id} style={{ padding: '7px 0', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}
               onClick={() => go('speakers', speaker.id)}>
               <div className="row small" style={{ justifyContent: 'space-between' }}>
-                <span className="trunc">{flag(speaker.country)} {speaker.nameEn}</span>
+                <span className="trunc">{flag(speaker.country)} {displayName(speaker)}</span>
                 <span className="row" style={{ gap: 4 }}>
                   {issues.some(i => i.level === '오류') && <Badge tone="critical">오류 {issues.filter(i => i.level === '오류').length}</Badge>}
                   {issues.some(i => i.level !== '오류') && <Badge tone="warning">확인 {issues.filter(i => i.level !== '오류').length}</Badge>}
@@ -242,7 +316,7 @@ export function Dashboard() {
             <table className="data">
               <thead><tr><th>일정</th><th>D-day</th><th>마일스톤</th><th>단계</th><th>담당</th></tr></thead>
               <tbody>
-                {conf.milestones.map(m => (
+                {[...conf.milestones].sort((a, b) => a.date.localeCompare(b.date)).map(m => (
                   <tr key={m.id}>
                     <td className="num nowrap">{fmtDate(m.date)}</td>
                     <td className="num nowrap"><Badge tone={m.date < today() ? 'neutral' : 'info'}>{ddayLabel(m.date)}</Badge></td>

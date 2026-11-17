@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { activeConference, readiness, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatusBadge, TierTag } from '../components/ui'
 import { flag, fmtDate, krwShort, toneOf } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 import type { Speaker } from '../types'
@@ -25,7 +26,7 @@ export function Speakers() {
     if (liaison !== '전체' && s.liaisonMemberId !== liaison) return false
     if (visaOnly && !s.visa.required) return false
     if (q) {
-      const hay = `${s.nameEn} ${s.affiliation} ${s.country} ${s.code} ${s.researchFields.join(' ')} ${s.tags.join(' ')}`.toLowerCase()
+      const hay = `${displayName(s)} ${s.affiliation} ${s.country} ${s.code} ${s.researchFields.join(' ')} ${s.tags.join(' ')}`.toLowerCase()
       if (!hay.includes(q.toLowerCase())) return false
     }
     return true
@@ -115,7 +116,7 @@ function Row({ s, liaisonName }: { s: Speaker; liaisonName: string }) {
         <div className="row" style={{ gap: 9 }}>
           <span style={{ fontSize: 17 }} aria-hidden>{flag(s.country)}</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 620 }}>{s.nameEn}</div>
+            <div style={{ fontWeight: 620 }}>{displayName(s)}</div>
             <div className="xsmall muted trunc" style={{ maxWidth: 230 }}>{s.title} · {s.affiliation}</div>
           </div>
         </div>

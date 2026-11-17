@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { speakersOf } from '../lib/metrics'
 import { Badge, Card, TierTag } from '../components/ui'
 import { ddayLabel, flag, fmtDate, krwShort, today } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 import type { PipelineStage } from '../types'
@@ -53,7 +54,7 @@ export function Pipeline() {
                     onClick={() => go('speakers', s.id)}>
                     <div className="row" style={{ gap: 6, marginBottom: 4 }}>
                       <span aria-hidden>{flag(s.country)}</span>
-                      <strong className="small trunc" style={{ flex: 1 }}>{s.nameEn}</strong>
+                      <strong className="small trunc" style={{ flex: 1 }}>{displayName(s)}</strong>
                       <TierTag tier={s.tier} />
                     </div>
                     <div className="xsmall muted trunc">{s.affiliation}</div>
@@ -99,7 +100,7 @@ export function Pipeline() {
         <Card title="대체 후보(Backup Pool)" sub="거절·취소 발생 시 즉시 투입">
           {list.filter(s => ['후보발굴', '내부승인'].includes(s.stage)).map(s => (
             <div key={s.id} className="row small" style={{ justifyContent: 'space-between', padding: '4px 0', cursor: 'pointer' }} onClick={() => go('speakers', s.id)}>
-              <span className="trunc">{flag(s.country)} {s.nameEn}</span>
+              <span className="trunc">{flag(s.country)} {displayName(s)}</span>
               <Badge tone="info">{s.stage}</Badge>
             </div>
           ))}

@@ -7,23 +7,19 @@ import type {
   AppState, ChecklistTemplate, Communication, Conference, Currency, Deliverable, DeliverableType,
   Flight, ID, MailTemplate, Member, Session, Speaker, SupportPackage, Task, AuditLog,
 } from '../types'
-import { PHASES } from '../types'
+import { CORE_MODULES, OVERSEAS_MODULES, PHASES } from '../types'
+import { COUNTRY_CODE, D_START, EU_COUNTRIES, FX, START, TODAY, addDays, hash, pick, toKRW } from './base'
+export { TODAY, START, D_START, addDays, hash, pick, toKRW }
 
-export const TODAY = '2026-09-16'
+import {
+  DCONF, docTemplates, domesticAbstracts, domesticAttachments, domesticChecklist, domesticComments,
+  domesticComms, domesticConference, domesticCredits, domesticDocs, domesticMembers, domesticPackages,
+  domesticRegistrations, domesticSessions, domesticSpeakers, domesticSponsors, domesticTasks,
+} from './seedDomestic'
 
-const d = (iso: string) => new Date(iso + 'T00:00:00')
-export const addDays = (iso: string, n: number): string => {
-  const t = d(iso); t.setDate(t.getDate() + n)
-  return t.toISOString().slice(0, 10)
-}
 
-/* 결정적 의사난수 — 새로고침해도 동일한 데모 데이터를 보장 */
-function hash(s: string): number {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
-  return Math.abs(h)
-}
-const pick = <T,>(seed: string, arr: T[]): T => arr[hash(seed) % arr.length]
+
+
 
 /* ─────────────────────────────── 구성원 ─────────────────────────────── */
 
@@ -41,17 +37,19 @@ export const members: Member[] = [
 /* ─────────────────────────────── 행사 ──────────────────────────────── */
 
 export const CONF_MAIN = 'CONF-2026-SSC'
-const START = '2026-11-18'
 
 export const conferences: Conference[] = [
   {
     id: CONF_MAIN,
     code: 'SSC2026',
+    scope: '국제',
+    industry: '학술',
+    modules: [...CORE_MODULES, ...OVERSEAS_MODULES],
     nameKo: '제12회 국제 스마트시티·AI 컨퍼런스',
     nameEn: '12th International Smart City & AI Conference',
     edition: '12th',
     startDate: START,
-    endDate: '2026-11-20',
+    endDate: addDays(START, 2),
     venue: '코엑스 그랜드볼룸 · 컨퍼런스룸 300~318',
     city: '서울',
     country: '대한민국',
@@ -84,11 +82,14 @@ export const conferences: Conference[] = [
   {
     id: 'CONF-2027-BIO',
     code: 'GBH2027',
+    scope: '국제',
+    industry: '의료·학회',
+    modules: [...CORE_MODULES, ...OVERSEAS_MODULES, '초록심사', '참가등록', '후원·전시'],
     nameKo: '2027 글로벌 바이오헬스 서밋',
     nameEn: 'Global Bio-Health Summit 2027',
     edition: '5th',
-    startDate: '2027-03-10',
-    endDate: '2027-03-12',
+    startDate: addDays(TODAY, 174),
+    endDate: addDays(TODAY, 176),
     venue: '부산 BEXCO 제1전시장',
     city: '부산',
     country: '대한민국',
@@ -105,18 +106,21 @@ export const conferences: Conference[] = [
     baseCurrency: 'KRW',
     tracks: ['Digital Therapeutics', 'Bio Manufacturing', 'Regulatory'],
     milestones: [
-      { id: 'MS1', label: '연사 롱리스트 작성', date: '2026-10-05', phase: '발굴·선정', owner: 'M02' },
-      { id: 'MS2', label: '선정위원회 1차', date: '2026-10-26', phase: '발굴·선정', owner: 'M01' },
+      { id: 'MS1', label: '연사 롱리스트 작성', date: addDays(TODAY, 20), phase: '발굴·선정', owner: 'M02' },
+      { id: 'MS2', label: '선정위원회 1차', date: addDays(TODAY, 41), phase: '발굴·선정', owner: 'M01' },
     ],
   },
   {
     id: 'CONF-2026-MOB',
     code: 'AMF2026',
+    scope: '국제',
+    industry: '협회',
+    modules: [...CORE_MODULES, ...OVERSEAS_MODULES],
     nameKo: '2026 아시아 모빌리티 포럼',
     nameEn: 'Asia Mobility Forum 2026',
     edition: '8th',
-    startDate: '2026-05-13',
-    endDate: '2026-05-14',
+    startDate: addDays(TODAY, -126),
+    endDate: addDays(TODAY, -125),
     venue: '인천 송도컨벤시아',
     city: '인천',
     country: '대한민국',
@@ -176,16 +180,16 @@ export const supportPackages: SupportPackage[] = [
 /* ─────────────────────────────── 세션 ──────────────────────────────── */
 
 export const sessions: Session[] = [
-  { id: 'S01', conferenceId: CONF_MAIN, title: '개회식 및 환영사', type: '개회식', track: 'Governance & Policy', date: '2026-11-18', startTime: '09:30', endTime: '10:00', room: '그랜드볼룸', mode: '현장', language: 'KO/EN', interpretation: true, chairMemberId: 'M01', speakerIds: [], recorded: true },
-  { id: 'S02', conferenceId: CONF_MAIN, title: 'Keynote I — Urban AI and the Next Decade of City Operations', type: '기조연설', track: 'Urban AI', date: '2026-11-18', startTime: '10:00', endTime: '10:50', room: '그랜드볼룸', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M01', speakerIds: ['SPK-2026-001'], capacity: 1200, recorded: true },
-  { id: 'S03', conferenceId: CONF_MAIN, title: 'Keynote II — Data Sovereignty in Cross-border Smart City Platforms', type: '기조연설', track: 'Governance & Policy', date: '2026-11-18', startTime: '11:00', endTime: '11:50', room: '그랜드볼룸', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M02', speakerIds: ['SPK-2026-003'], capacity: 1200, recorded: true },
-  { id: 'S04', conferenceId: CONF_MAIN, title: 'Track A — Digital Twin for Urban Resilience', type: '초청강연', track: 'Digital Twin', date: '2026-11-18', startTime: '14:00', endTime: '15:30', room: '컨퍼런스룸 301', mode: '하이브리드', language: 'EN', interpretation: false, chairMemberId: 'M03', speakerIds: ['SPK-2026-002', 'SPK-2026-012'], capacity: 250, recorded: true },
-  { id: 'S05', conferenceId: CONF_MAIN, title: 'Track B — Mobility-as-a-Service in Emerging Cities', type: '초청강연', track: 'Mobility', date: '2026-11-19', startTime: '10:00', endTime: '11:30', room: '컨퍼런스룸 305', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M03', speakerIds: ['SPK-2026-004', 'SPK-2026-009'], capacity: 250, recorded: true },
-  { id: 'S06', conferenceId: CONF_MAIN, title: 'Keynote III — Climate-Adaptive Infrastructure Financing', type: '기조연설', track: 'Climate & Energy', date: '2026-11-19', startTime: '13:00', endTime: '13:50', room: '그랜드볼룸', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M01', speakerIds: ['SPK-2026-010'], capacity: 1200, recorded: true },
-  { id: 'S07', conferenceId: CONF_MAIN, title: 'Panel — Global South Perspectives on Urban AI Governance', type: '패널토론', track: 'Governance & Policy', date: '2026-11-19', startTime: '15:00', endTime: '16:30', room: '컨퍼런스룸 300', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M02', speakerIds: ['SPK-2026-005', 'SPK-2026-011', 'SPK-2026-006', 'SPK-2026-014'], capacity: 300, recorded: true },
-  { id: 'S08', conferenceId: CONF_MAIN, title: 'Workshop — Building Open Urban Data Pipelines', type: '워크숍', track: 'Urban AI', date: '2026-11-20', startTime: '09:30', endTime: '12:00', room: '컨퍼런스룸 312', mode: '현장', language: 'EN', interpretation: false, chairMemberId: 'M04', speakerIds: ['SPK-2026-009'], capacity: 60, recorded: false },
-  { id: 'S09', conferenceId: CONF_MAIN, title: 'Roundtable — City-to-City AI Policy Alignment', type: '라운드테이블', track: 'Governance & Policy', date: '2026-11-20', startTime: '13:30', endTime: '15:00', room: '컨퍼런스룸 318', mode: '현장', language: 'EN', interpretation: false, chairMemberId: 'M01', speakerIds: ['SPK-2026-007', 'SPK-2026-013'], capacity: 40, recorded: false },
-  { id: 'S10', conferenceId: CONF_MAIN, title: 'Gala Dinner & Award Ceremony', type: '만찬', track: 'Governance & Policy', date: '2026-11-19', startTime: '18:30', endTime: '21:00', room: '인터컨티넨탈 하모니볼룸', mode: '현장', language: 'KO/EN', interpretation: true, chairMemberId: 'M01', speakerIds: [], recorded: false },
+  { id: 'S01', conferenceId: CONF_MAIN, title: '개회식 및 환영사', type: '개회식', track: 'Governance & Policy', date: addDays(START, 0), startTime: '09:30', endTime: '10:00', room: '그랜드볼룸', mode: '현장', language: 'KO/EN', interpretation: true, chairMemberId: 'M01', speakerIds: [], recorded: true },
+  { id: 'S02', conferenceId: CONF_MAIN, title: 'Keynote I — Urban AI and the Next Decade of City Operations', type: '기조연설', track: 'Urban AI', date: addDays(START, 0), startTime: '10:00', endTime: '10:50', room: '그랜드볼룸', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M01', speakerIds: ['SPK-2026-001'], capacity: 1200, recorded: true },
+  { id: 'S03', conferenceId: CONF_MAIN, title: 'Keynote II — Data Sovereignty in Cross-border Smart City Platforms', type: '기조연설', track: 'Governance & Policy', date: addDays(START, 0), startTime: '11:00', endTime: '11:50', room: '그랜드볼룸', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M02', speakerIds: ['SPK-2026-003'], capacity: 1200, recorded: true },
+  { id: 'S04', conferenceId: CONF_MAIN, title: 'Track A — Digital Twin for Urban Resilience', type: '초청강연', track: 'Digital Twin', date: addDays(START, 0), startTime: '14:00', endTime: '15:30', room: '컨퍼런스룸 301', mode: '하이브리드', language: 'EN', interpretation: false, chairMemberId: 'M03', speakerIds: ['SPK-2026-002', 'SPK-2026-012'], capacity: 250, recorded: true },
+  { id: 'S05', conferenceId: CONF_MAIN, title: 'Track B — Mobility-as-a-Service in Emerging Cities', type: '초청강연', track: 'Mobility', date: addDays(START, 1), startTime: '10:00', endTime: '11:30', room: '컨퍼런스룸 305', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M03', speakerIds: ['SPK-2026-004', 'SPK-2026-009'], capacity: 250, recorded: true },
+  { id: 'S06', conferenceId: CONF_MAIN, title: 'Keynote III — Climate-Adaptive Infrastructure Financing', type: '기조연설', track: 'Climate & Energy', date: addDays(START, 1), startTime: '13:00', endTime: '13:50', room: '그랜드볼룸', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M01', speakerIds: ['SPK-2026-010'], capacity: 1200, recorded: true },
+  { id: 'S07', conferenceId: CONF_MAIN, title: 'Panel — Global South Perspectives on Urban AI Governance', type: '패널토론', track: 'Governance & Policy', date: addDays(START, 1), startTime: '15:00', endTime: '16:30', room: '컨퍼런스룸 300', mode: '현장', language: 'EN', interpretation: true, chairMemberId: 'M02', speakerIds: ['SPK-2026-005', 'SPK-2026-011', 'SPK-2026-006', 'SPK-2026-014'], capacity: 300, recorded: true },
+  { id: 'S08', conferenceId: CONF_MAIN, title: 'Workshop — Building Open Urban Data Pipelines', type: '워크숍', track: 'Urban AI', date: addDays(START, 2), startTime: '09:30', endTime: '12:00', room: '컨퍼런스룸 312', mode: '현장', language: 'EN', interpretation: false, chairMemberId: 'M04', speakerIds: ['SPK-2026-009'], capacity: 60, recorded: false },
+  { id: 'S09', conferenceId: CONF_MAIN, title: 'Roundtable — City-to-City AI Policy Alignment', type: '라운드테이블', track: 'Governance & Policy', date: addDays(START, 2), startTime: '13:30', endTime: '15:00', room: '컨퍼런스룸 318', mode: '현장', language: 'EN', interpretation: false, chairMemberId: 'M01', speakerIds: ['SPK-2026-007', 'SPK-2026-013'], capacity: 40, recorded: false },
+  { id: 'S10', conferenceId: CONF_MAIN, title: 'Gala Dinner & Award Ceremony', type: '만찬', track: 'Governance & Policy', date: addDays(START, 1), startTime: '18:30', endTime: '21:00', room: '인터컨티넨탈 하모니볼룸', mode: '현장', language: 'KO/EN', interpretation: true, chairMemberId: 'M01', speakerIds: [], recorded: false },
 ]
 
 /* ─────────────────── 제출물 / 정산 / 현장 기본값 생성기 ─────────────────── */
@@ -206,14 +210,7 @@ const DELIVERABLE_PLAN: { type: DeliverableType; offset: number; euOnly?: boolea
   { type: '발표자료(PPT)', offset: -14 },
 ]
 
-const EU_COUNTRIES = ['프랑스', '독일', '네덜란드', '노르웨이', '이탈리아']
 
-/** 여권번호 접두 등 표기에 쓰는 국가 코드 */
-export const COUNTRY_CODE: Record<string, string> = {
-  영국: 'GB', 프랑스: 'FR', 싱가포르: 'SG', 인도: 'IN', 이집트: 'EG', 독일: 'DE', 일본: 'JP',
-  멕시코: 'MX', 베트남: 'VN', 미국: 'US', 나이지리아: 'NG', 네덜란드: 'NL', 중국: 'CN',
-  호주: 'AU', 노르웨이: 'NO', 캐나다: 'CA', 이탈리아: 'IT',
-}
 const STAGE_RANK: Record<string, number> = {
   '후보발굴': 0, '내부승인': 1, '사전타진': 2, '공식초청': 3, '수락': 4, '계약완료': 5, '거절': -1, '취소': -1,
 }
@@ -254,8 +251,6 @@ function makeDeliverables(code: string, stage: string, country: string, mode: st
     })
 }
 
-const FX: Record<string, number> = { KRW: 1, USD: 1380, EUR: 1490, JPY: 9.1, GBP: 1750, SGD: 1020 }
-export const toKRW = (amount: number, cur: string) => Math.round(amount * (FX[cur] ?? 1))
 
 /* ─────────────────────────────── 초청자(연사) ─────────────────────────── */
 
@@ -329,8 +324,8 @@ function mk(s: Spec): Speaker {
      (갈라디너·리셉션 참석 대상은 해당 일자도 체류에 포함) */
   const programDates = [
     ...(s.sessionIds ?? []).map(id => sessions.find(x => x.id === id)?.date).filter(Boolean) as string[],
-    ...(['Keynote', 'Invited'].includes(s.tier) && onsite ? ['2026-11-19'] : []),
-    ...(s.tier === 'Keynote' && onsite ? ['2026-11-17'] : []),
+    ...(['Keynote', 'Invited'].includes(s.tier) && onsite ? [addDays(START, 1)] : []),
+    ...(s.tier === 'Keynote' && onsite ? [addDays(START, -1)] : []),
   ].sort()
   const firstDay = programDates[0] ?? START
   const lastDay = programDates[programDates.length - 1] ?? addDays(START, 1)
@@ -347,7 +342,7 @@ function mk(s: Spec): Speaker {
     const bookingClass = pkg.airCabin === '비즈니스' ? `BZ${200 + (hash(code) % 80)}`
       : pkg.airCabin === '프리미엄이코노미' ? `PY${100 + (hash(code) % 80)}` : `EY${100 + (hash(code) % 80)}`
     const mk1 = (dir: '입국' | '출국', flightNo: string, dep: string, arr: string): Flight => ({
-      id: `${code}-F${dir === '입국' ? 1 : 2}`, direction: dir, carrier: r.carrier, flightNo,
+      id: `${code}-F${dir === '입국' ? 1 : 2}`, direction: dir, mode: '국제선', carrier: r.carrier, flightNo,
       from: dir === '입국' ? r.iata : 'ICN', fromCity: dir === '입국' ? r.cityEn : 'Seoul, KR',
       to: dir === '입국' ? 'ICN' : r.iata, toCity: dir === '입국' ? 'Seoul, KR' : r.cityEn,
       departAt: dep, arriveAt: arr,
@@ -410,7 +405,7 @@ function mk(s: Spec): Speaker {
     if (onsite && ['Keynote', 'Invited'].includes(s.tier)) {
       programs.push({
         id: `${code}-PG`, name: 'Gala Dinner & Award Ceremony', type: '만찬',
-        date: '2026-11-19', time: '18:30–21:00', place: '인터컨티넨탈 하모니볼룸',
+        date: addDays(START, 1), time: '18:30–21:00', place: '인터컨티넨탈 하모니볼룸',
         status: confirmed ? '등록' : '대기',
         seat: contracted ? `Table ${(hash(code + 'tbl') % 12) + 1}` : undefined,
         note: s.dietary ? `특별식: ${s.dietary}` : undefined,
@@ -419,7 +414,7 @@ function mk(s: Spec): Speaker {
     if (onsite && s.tier === 'Keynote') {
       programs.push({
         id: `${code}-PW`, name: 'Welcome Reception (조직위 주최)', type: '리셉션',
-        date: '2026-11-17', time: '19:00–21:00', place: '코엑스 아셈볼룸',
+        date: addDays(START, -1), time: '19:00–21:00', place: '코엑스 아셈볼룸',
         status: confirmed ? '등록' : '대기',
       })
     }
@@ -494,7 +489,7 @@ function mk(s: Spec): Speaker {
     assistantEmail: s.tier === 'Keynote' ? `office@${s.affiliation.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}.example.org` : undefined,
     researchFields: s.fields, languages: s.langs,
     profileUrl: `https://scholar.example.org/${s.nameEn.replace(/\s/g, '-').toLowerCase()}`,
-    tier: s.tier, stage: s.stage, attendance, sponsorship,
+    tier: s.tier, residency: '해외', stage: s.stage, attendance, sponsorship,
     priority: s.priority ?? (s.tier === 'Keynote' ? '상' : '중'),
     attendanceMode: mode, recommendedBy: s.recommendedBy,
     previousParticipation: s.previousParticipation,
@@ -515,8 +510,8 @@ function mk(s: Spec): Speaker {
       nameEn: passportName,
       numberMasked: passportNo,
       nationality: s.country,
-      issueDate: '2021-0' + ((hash(code) % 8) + 1) + '-1' + (hash(code) % 9),
-      expiryDate: s.passportExpiry ?? '2031-0' + ((hash(code) % 8) + 1) + '-1' + (hash(code) % 9),
+      issueDate: addDays(TODAY, -(1500 + hash(code) % 400)),
+      expiryDate: s.passportExpiry ?? addDays(TODAY, 1200 + hash(code) % 600),
       scanReceived: true,
     } : undefined,
     visa: s.visa,
@@ -551,6 +546,7 @@ function mk(s: Spec): Speaker {
     deliverables: makeDeliverables(code, s.stage, s.country, mode, treaty),
     settlement: {
       honorarium, currency: 'KRW',
+      taxType: treaty ? '조세조약 제한세율' : '비거주자(22%)',
       withholdingRate: s.treatyRate ?? 22,
       taxTreatyApplied: treaty,
       treatyCountry: treaty ? s.country : undefined,
@@ -619,7 +615,7 @@ export const speakers: Speaker[] = [
     visa: {
       required: true, track: 'C-4 단기취업', stage: '영사관접수', ketaRequired: false, ketaStatus: '해당없음',
       ccviRequired: true, ccviNumber: 'CCVI-2026-0418', consulate: '주뭄바이 대한민국 총영사관',
-      appointmentAt: '2026-09-24T10:30', submittedAt: '2026-09-24', leadTimeDays: 21,
+      appointmentAt: `${addDays(TODAY, 8)}T10:30`, submittedAt: addDays(TODAY, 8), leadTimeDays: 21,
       invitationLetterIssuedAt: addDays(START, -88), guaranteeLetterRequired: true,
       memo: '강연료 수령으로 C-4(단기취업) 판정. 사증발급인정서 발급 완료 후 영사관 접수됨.',
     },
@@ -712,7 +708,7 @@ export const speakers: Speaker[] = [
     visa: {
       required: true, track: 'C-3-1 단기방문', stage: '인터뷰', ketaRequired: false, ketaStatus: '해당없음',
       ccviRequired: true, ccviNumber: 'CCVI-2026-0455', consulate: '주나이지리아 대한민국 대사관',
-      appointmentAt: '2026-09-29T09:00', leadTimeDays: 35, invitationLetterIssuedAt: addDays(START, -80),
+      appointmentAt: `${addDays(TODAY, 13)}T09:00`, leadTimeDays: 35, invitationLetterIssuedAt: addDays(START, -80),
       guaranteeLetterRequired: true, rejectionReason: undefined,
       memo: '2024년 타 학회 초청 시 사증 거절 이력 — 초청사유서·신원보증서·재정보증 강화 제출.',
     },
@@ -739,7 +735,7 @@ export const speakers: Speaker[] = [
     visa: {
       required: true, track: 'C-3-4 단기상용', stage: '발급완료', ketaRequired: false, ketaStatus: '해당없음',
       ccviRequired: false, consulate: '주중국 대한민국 대사관(베이징)', submittedAt: addDays(TODAY, -38),
-      issuedAt: addDays(TODAY, -12), visaExpiry: '2027-03-15', leadTimeDays: 15,
+      issuedAt: addDays(TODAY, -12), visaExpiry: addDays(START, 120), leadTimeDays: 15,
       invitationLetterIssuedAt: addDays(TODAY, -50), guaranteeLetterRequired: false,
       memo: '복수사증 발급 완료(유효 3개월, 체류 30일).',
     },
@@ -1022,22 +1018,42 @@ function makeAudit(): AuditLog[] {
 
 export const auditLogs: AuditLog[] = makeAudit()
 
+/* ───────────────────────── 국내 학회 변경 이력 ───────────────────────── */
+
+const domesticAuditLogs: AuditLog[] = [
+  { id: 'DAL-001', at: `${addDays(TODAY, -1)}T20:10`, actor: '조현수', action: '수정', entityType: '행사', entityId: DCONF, entityLabel: '제38차 추계학술대회', field: '사전등록 할인 마감', before: '연장 검토', after: '현행 유지(D-10)', memo: '제3차 조직위 결정' },
+  { id: 'DAL-002', at: `${addDays(TODAY, -2)}T11:15`, actor: '유상혁', action: '수정', entityType: '연사', entityId: 'SP-06', entityLabel: '서울의료기', field: '부스 위치 변경 요청', before: '검토', after: '현행 유지', memo: '운영회의 결정 회신 완료' },
+  { id: 'DAL-003', at: `${addDays(TODAY, -3)}T14:20`, actor: '서가은', action: '수정', entityType: '연사', entityId: 'DSPK-011', entityLabel: '임동현 교수', field: '계약 상태', before: '발송', after: '회수 지연', memo: '금주 내 전화 확인 예정' },
+  { id: 'DAL-004', at: `${addDays(TODAY, -4)}T13:00`, actor: '서가은', action: '수정', entityType: '정산', entityId: 'DSPK-014', entityLabel: 'Emily Carter', field: '거주자증명서', before: '미수령', after: '수령', memo: '한-미 조세조약 면제 적용 가능' },
+  { id: 'DAL-005', at: `${addDays(TODAY, -6)}T19:30`, actor: '문지현', action: '생성', entityType: '업무', entityId: 'DOC-01', entityLabel: '제3차 조직위원회 회의록', after: '액션 아이템 4건 배분' },
+  { id: 'DAL-006', at: `${addDays(D_START, -24)}T10:00`, actor: '조현수', action: '승인', entityType: '행사', entityId: 'CR-01', entityLabel: '대한의사협회 연수평점', field: '평점 승인', after: '6평점 승인' },
+]
+
 /* ───────────────────────── 초기 상태 ───────────────────────── */
 
 export const initialState: AppState = {
-  version: 1,
-  currentUserId: 'M01',
-  activeConferenceId: CONF_MAIN,
-  members,
-  conferences,
-  sessions,
-  speakers,
-  supportPackages,
-  tasks,
-  communications,
+  version: 2,
+  currentUserId: 'M11',
+  // 국내 학회를 기본 화면으로 둔다(국제 행사는 상단 선택기에서 전환).
+  activeConferenceId: DCONF,
+  members: [...members, ...domesticMembers],
+  conferences: [domesticConference, ...conferences],
+  sessions: [...sessions, ...domesticSessions],
+  speakers: [...speakers, ...domesticSpeakers],
+  supportPackages: [...supportPackages, ...domesticPackages],
+  tasks: [...tasks, ...domesticTasks],
+  communications: [...communications, ...domesticComms],
   mailTemplates,
-  checklistTemplates,
-  auditLogs,
+  checklistTemplates: [...checklistTemplates, domesticChecklist],
+  auditLogs: [...auditLogs, ...domesticAuditLogs],
+  creditPrograms: domesticCredits,
+  abstracts: domesticAbstracts,
+  registrations: domesticRegistrations,
+  sponsors: domesticSponsors,
+  docs: domesticDocs,
+  docTemplates,
+  comments: domesticComments,
+  attachments: domesticAttachments,
 }
 
 export const PHASE_LIST = PHASES

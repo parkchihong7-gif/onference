@@ -63,12 +63,14 @@ export function computeRisks(state: AppState): Risk[] {
 
   speakersOf(state).forEach(sp => {
     if (sp.stage === '거절' || sp.stage === '취소') return
-    const name = sp.nameEn
+    const name = sp.nameKo || sp.nameEn
     const push = (r: Omit<Risk, 'id' | 'speakerId' | 'speakerName'>) =>
       risks.push({ ...r, id: `${sp.id}-${r.category}-${risks.length}`, speakerId: sp.id, speakerName: name })
 
-    /* 1. 비자 리드타임 */
-    if (sp.visa.required && !['발급완료'].includes(sp.visa.stage)) {
+    const overseas = sp.residency === '해외'
+
+    /* 1. 비자 리드타임 (해외 연자 전용) */
+    if (overseas && sp.visa.required && !['발급완료'].includes(sp.visa.stage)) {
       const need = visaLeadDays(sp)
       if (sp.visa.stage === '거절') {
         push({ level: 'critical', category: '비자', title: '사증 거절 — 대체 시나리오 필요', detail: `${sp.visa.track} 거절. 재신청 또는 온라인 발표 전환 결정 필요.`, dueDate: conf.startDate })
@@ -94,21 +96,31 @@ export function computeRisks(state: AppState): Risk[] {
       }
     }
 
-    /* 2. 여권 유효기간 */
-    if (sp.passport?.expiryDate && daysBetween(conf.endDate, sp.passport.expiryDate) < 180) {
+    /* 2. 여권 유효기간 (해외 연자 전용) */
+    if (overseas && sp.passport?.expiryDate && daysBetween(conf.endDate, sp.passport.expiryDate) < 180) {
       push({ level: 'serious', category: '여권', title: '여권 잔여 유효기간 6개월 미만', detail: `만료일 ${sp.passport.expiryDate} — 갱신 후 재수취 필요`, dueDate: sp.passport.expiryDate })
     }
 
     /* 3. 발권 */
     if (isConfirmed(sp) && sp.attendanceMode !== '온라인') {
-      const ticketed = sp.flights.some(f => f.eTicketReceived)
-      if (!ticketed && daysToEvent <= 60) {
-        push({ level: daysToEvent <= 30 ? 'critical' : 'serious', category: '항공', title: '항공 미발권', detail: sp.flights.length ? '스케줄 확정, e-Ticket 미수령' : '항공 스케줄 미확정 — 요금 보장 마감 경과', dueDate: conf.startDate })
+      const needsTicket = sp.residency === '해외' || sp.flights.length > 0
+      const ticketed = !needsTicket || sp.flights.some(f => f.eTicketReceived || f.mode === '자가용')
+      // 국제선은 요금 보장 마감(D-60)이 기준, 국내 교통은 D-14면 충분하다.
+      const bookBy = overseas ? 60 : 14
+      if (!ticketed && daysToEvent <= bookBy) {
+        push({
+          level: daysToEvent <= bookBy / 2 ? 'critical' : 'serious', category: '항공',
+          title: overseas ? '항공 미발권' : '교통편 미확정',
+          detail: sp.flights.length ? '스케줄 확정, 발권 미완료' : (overseas ? '항공 스케줄 미확정 — 요금 보장 마감 경과' : 'KTX·국내선 등 이동 수단 미확정'),
+          dueDate: conf.startDate,
+        })
       }
-      if (!sp.hotel && daysToEvent <= 55) {
+      // 숙박은 '원거리에서 오는 연자'에게만 필요하다(당일 참석 가능한 근거리 연자는 대상 아님).
+      const needsStay = overseas || sp.flights.some(f => ['국제선', '국내선', 'KTX', '고속버스'].includes(f.mode))
+      if (needsStay && !sp.hotel && sp.supportedNights > 0 && daysToEvent <= 55) {
         push({ level: 'warning', category: '숙박', title: '숙박 미확정', detail: '객실 블록 마감 임박', dueDate: conf.startDate })
       }
-      if (!sp.transfers.length && daysToEvent <= 14) {
+      if (overseas && !sp.transfers.length && daysToEvent <= 14) {
         push({ level: 'warning', category: '의전', title: '공항 배차 미배정', detail: '픽업/샌딩 차량·담당자 미지정', dueDate: conf.startDate })
       }
     }
@@ -153,8 +165,8 @@ export function readiness(sp: Speaker): Readiness {
   const items = [
     { label: '초청 수락', done: ['수락', '계약완료'].includes(sp.stage) },
     { label: '계약 서명', done: sp.agreementStatus === '서명완료' },
-    { label: '비자/입국', done: !sp.visa.required ? sp.visa.ketaStatus !== '신청전' : sp.visa.stage === '발급완료', na: online },
-    { label: '항공 발권', done: sp.flights.some(f => f.eTicketReceived), na: online },
+    { label: '비자/입국', done: !sp.visa.required ? sp.visa.ketaStatus !== '신청전' : sp.visa.stage === '발급완료', na: online || sp.residency === '국내' },
+    { label: '교통 확정', done: sp.flights.some(f => f.eTicketReceived || f.mode === '자가용'), na: online || sp.flights.length === 0 },
     { label: '숙박 확정', done: !!sp.hotel?.confirmationNo, na: online },
     { label: '배차 확정', done: sp.transfers.some(t => t.status === '확정'), na: online || !sp.transfers.length },
     { label: '제출물 검수', done: docsDone >= Math.ceil(sp.deliverables.length * 0.8) },
@@ -201,9 +213,10 @@ export function kpis(state: AppState): Kpi {
     count: list.filter(sp => reachedIdx(sp) >= target).length,
   }))
   const responded = list.filter(sp => ['수락', '계약완료', '거절'].includes(sp.stage))
-  const visaCases = list.filter(sp => sp.visa.required && sp.stage !== '거절')
+  const visaCases = list.filter(sp => sp.residency === '해외' && sp.visa.required && sp.stage !== '거절')
   const docs = confirmed.flatMap(sp => sp.deliverables)
-  const needFlights = confirmed.filter(sp => sp.attendanceMode !== '온라인')
+  // 근거리 자력 이동(도보·대중교통) 연자는 예약 대상이 아니므로 분모에서 제외한다.
+  const needFlights = confirmed.filter(sp => sp.attendanceMode !== '온라인' && (sp.residency === '해외' || sp.flights.length > 0))
   const tasks = tasksOf(state)
   const expenses = confirmed.flatMap(sp => sp.settlement.expenses)
   const honorarium = confirmed.reduce((a, sp) => a + sp.settlement.honorarium, 0)
@@ -217,7 +230,7 @@ export function kpis(state: AppState): Kpi {
     visaDone: visaCases.filter(sp => sp.visa.stage === '발급완료').length,
     docTotal: docs.length,
     docDone: docs.filter(d => d.status === '검수완료').length,
-    flightsTicketed: needFlights.filter(sp => sp.flights.some(f => f.eTicketReceived)).length,
+    flightsTicketed: needFlights.filter(sp => sp.flights.some(f => f.eTicketReceived || f.mode === '자가용')).length,
     flightsNeeded: needFlights.length,
     taskTotal: tasks.length,
     taskDone: tasks.filter(t => t.status === '완료').length,
@@ -260,7 +273,9 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
   const outbound = sp.flights.find(f => f.direction === '출국')
   const online = sp.attendanceMode === '온라인'
 
-  /* 1. 항공 탑승자명 vs 여권 영문명 */
+  const overseas = sp.residency === '해외'
+
+  /* 1. 항공 탑승자명 vs 여권 영문명 (해외 연자 전용) */
   sp.flights.forEach(f => {
     if (sp.passport && f.passengerName && f.passengerName.replace(/\s/g, '') !== sp.passport.nameEn.replace(/\s/g, '')) {
       push('오류', '항공 탑승자명',
@@ -269,16 +284,16 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
     }
   })
 
-  /* 2. 송금 수취인명 vs 여권 영문명 */
+  /* 2. 송금 수취인명 vs 여권 영문명 (해외 송금만 해당) */
   const bene = sp.settlement.remittance?.beneficiary
-  if (bene && sp.passport && bene.replace(/\s/g, '') !== sp.passport.nameEn.replace(/\s/g, '')) {
+  if (overseas && bene && sp.passport && bene.replace(/\s/g, '') !== sp.passport.nameEn.replace(/\s/g, '')) {
     push('오류', '송금 수취인명',
       `송금 수취인 "${bene}" 이 여권 영문명과 다릅니다. 해외 송금이 반송될 수 있습니다.`,
       '연사에게 은행 계좌 영문명 재확인')
   }
 
-  /* 3. 여권 없이 발권 */
-  if (!online && sp.flights.length && !sp.passport?.scanReceived) {
+  /* 3. 여권 없이 발권 (해외 연자 전용) */
+  if (overseas && !online && sp.flights.length && !sp.passport?.scanReceived) {
     push('오류', '여권 사본',
       '여권 사본 미수취 상태에서 항공 예약이 생성되었습니다.',
       '여권 사본 수취 후 예약 정보(영문명·번호) 대조')
@@ -359,9 +374,9 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
       '자비 참가(Non-Sponsored)로 등록되어 있으나 주최 부담 실비가 입력되어 있습니다.',
       '지원 구분 또는 실비 내역 수정')
   }
-  if (isSponsored(sp) && isConfirmed(sp) && !online && !sp.flights.length) {
+  if (overseas && isSponsored(sp) && isConfirmed(sp) && !online && !sp.flights.length) {
     push('경고', '항공',
-      '주최 지원 대상이나 항공 예약이 없습니다.',
+      '해외 연자이나 항공 예약이 없습니다.',
       '여행사에 스케줄 요청(요금 보장 마감 확인)')
   }
 
@@ -378,7 +393,7 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
   }
 
   /* 9. 사증 유효기간 */
-  if (sp.visa.required && sp.visa.visaExpiry && inbound && sp.visa.visaExpiry < inbound.arriveAt.slice(0, 10)) {
+  if (overseas && sp.visa.required && sp.visa.visaExpiry && inbound && sp.visa.visaExpiry < inbound.arriveAt.slice(0, 10)) {
     push('오류', '사증 유효기간',
       `사증 만료일(${sp.visa.visaExpiry})이 입국 예정일보다 빠릅니다.`,
       '사증 재발급 신청')

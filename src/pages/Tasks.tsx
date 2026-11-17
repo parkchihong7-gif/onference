@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { activeConference, tasksOf } from '../lib/metrics'
 import { Badge, Card, StatTile, StatusBadge } from '../components/ui'
 import { ddayLabel, flag, fmtDate, today } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { PHASES } from '../types'
 import type { PhaseKey, TaskStatus } from '../types'
@@ -117,7 +118,7 @@ export function TasksPage() {
                     <td style={{ textDecoration: t.status === '완료' ? 'line-through' : undefined }}>{t.title}</td>
                     <td className="small muted nowrap">{t.phase}</td>
                     <td className="small nowrap clickable" onClick={() => sp && go('speakers', sp.id)}>
-                      {sp ? `${flag(sp.country)} ${sp.nameEn}` : <span className="muted">공통</span>}
+                      {sp ? `${flag(sp.country)} ${displayName(sp)}` : <span className="muted">공통</span>}
                     </td>
                     <td className="small nowrap">{state.members.find(m => m.id === t.ownerMemberId)?.name}</td>
                     <td className="num nowrap small">{fmtDate(t.dueDate)}</td>

@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import type { ReactNode } from 'react'
-import type { AppState, AuditLog, Communication, Deliverable, PipelineStage, Speaker, Task, VisaStage } from './types'
+import type {
+  Abstract, AppState, AuditLog, Comment, Communication, CreditProgram, Deliverable, Doc,
+  ModuleKey, PipelineStage, Registration, Speaker, Sponsor, Task, VisaStage,
+} from './types'
 import { initialState } from './data/seed'
 import { today } from './lib/format'
 
@@ -16,6 +19,16 @@ export type Action =
   | { type: 'PATCH_TASK'; id: string; patch: Partial<Task> }
   | { type: 'ADD_TASK'; task: Task }
   | { type: 'ADD_COMM'; comm: Communication }
+  | { type: 'ADD_DOC'; doc: Doc }
+  | { type: 'UPDATE_DOC'; id: string; patch: Partial<Doc> }
+  | { type: 'DELETE_DOC'; id: string }
+  | { type: 'ADD_COMMENT'; comment: Comment }
+  | { type: 'TOGGLE_COMMENT'; id: string }
+  | { type: 'PATCH_ABSTRACT'; id: string; patch: Partial<Abstract> }
+  | { type: 'PATCH_REGISTRATION'; id: string; patch: Partial<Registration> }
+  | { type: 'PATCH_SPONSOR'; id: string; patch: Partial<Sponsor> }
+  | { type: 'PATCH_CREDIT'; id: string; patch: Partial<CreditProgram> }
+  | { type: 'TOGGLE_MODULE'; conferenceId: string; module: ModuleKey }
   | { type: 'RESET' }
 
 /** 감사 로그 시각은 실제 시각, 업무 일자는 데모 기준일(today())을 사용한다 */
@@ -111,6 +124,83 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         communications: [action.comm, ...state.communications],
         auditLogs: [log(state, { action: '발송', entityType: '커뮤니케이션', entityId: action.comm.speakerId, entityLabel: sp?.nameEn ?? '-', field: action.comm.subject, after: action.comm.status }), ...state.auditLogs],
+      }
+    }
+
+    case 'ADD_DOC':
+      return {
+        ...state, docs: [action.doc, ...state.docs],
+        auditLogs: [log(state, { action: '생성', entityType: '업무', entityId: action.doc.id, entityLabel: action.doc.title, field: action.doc.type, after: '문서 생성' }), ...state.auditLogs],
+      }
+
+    case 'UPDATE_DOC': {
+      const doc = state.docs.find(d => d.id === action.id)
+      if (!doc) return state
+      return {
+        ...state,
+        docs: state.docs.map(d => (d.id === action.id ? { ...d, ...action.patch, updatedAt: bizDate() } : d)),
+        auditLogs: [log(state, { action: '수정', entityType: '업무', entityId: doc.id, entityLabel: doc.title, field: '문서 내용', after: '수정됨' }), ...state.auditLogs],
+      }
+    }
+
+    case 'DELETE_DOC':
+      return { ...state, docs: state.docs.filter(d => d.id !== action.id) }
+
+    case 'ADD_COMMENT':
+      return { ...state, comments: [action.comment, ...state.comments] }
+
+    case 'TOGGLE_COMMENT':
+      return { ...state, comments: state.comments.map(c => (c.id === action.id ? { ...c, resolved: !c.resolved } : c)) }
+
+    case 'PATCH_ABSTRACT': {
+      const a = state.abstracts.find(x => x.id === action.id)
+      if (!a) return state
+      return {
+        ...state,
+        abstracts: state.abstracts.map(x => (x.id === action.id ? { ...x, ...action.patch } : x)),
+        auditLogs: action.patch.status
+          ? [log(state, { action: '수정', entityType: '제출물', entityId: a.id, entityLabel: `${a.code} ${a.title.slice(0, 20)}`, field: '초록 심사 상태', before: a.status, after: action.patch.status }), ...state.auditLogs]
+          : state.auditLogs,
+      }
+    }
+
+    case 'PATCH_REGISTRATION':
+      return { ...state, registrations: state.registrations.map(r => (r.id === action.id ? { ...r, ...action.patch } : r)) }
+
+    case 'PATCH_SPONSOR': {
+      const sp = state.sponsors.find(x => x.id === action.id)
+      if (!sp) return state
+      return {
+        ...state,
+        sponsors: state.sponsors.map(x => (x.id === action.id ? { ...x, ...action.patch } : x)),
+        auditLogs: action.patch.contractStatus
+          ? [log(state, { action: '수정', entityType: '행사', entityId: sp.id, entityLabel: sp.company, field: '후원 계약 상태', before: sp.contractStatus, after: action.patch.contractStatus }), ...state.auditLogs]
+          : state.auditLogs,
+      }
+    }
+
+    case 'PATCH_CREDIT': {
+      const c = state.creditPrograms.find(x => x.id === action.id)
+      if (!c) return state
+      return {
+        ...state,
+        creditPrograms: state.creditPrograms.map(x => (x.id === action.id ? { ...x, ...action.patch } : x)),
+        auditLogs: action.patch.status
+          ? [log(state, { action: '수정', entityType: '행사', entityId: c.id, entityLabel: `${c.authority} ${c.category}`, field: '평점 신청 상태', before: c.status, after: action.patch.status }), ...state.auditLogs]
+          : state.auditLogs,
+      }
+    }
+
+    case 'TOGGLE_MODULE': {
+      const conf = state.conferences.find(c => c.id === action.conferenceId)
+      if (!conf) return state
+      const on = conf.modules.includes(action.module)
+      return {
+        ...state,
+        conferences: state.conferences.map(c => (c.id !== conf.id ? c : {
+          ...c, modules: on ? c.modules.filter(m => m !== action.module) : [...c.modules, action.module],
+        })),
+        auditLogs: [log(state, { action: '수정', entityType: '행사', entityId: conf.id, entityLabel: conf.nameKo, field: `모듈 · ${action.module}`, before: on ? '활성' : '비활성', after: on ? '비활성' : '활성' }), ...state.auditLogs],
       }
     }
 

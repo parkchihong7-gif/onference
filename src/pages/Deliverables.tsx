@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatTile, StackBar } from '../components/ui'
 import { ddayLabel, flag, fmtDate, pct, today } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 import type { DeliverableStatus } from '../types'
@@ -112,7 +113,7 @@ export function Deliverables() {
                 return (
                   <tr key={s.id}>
                     <td className="clickable" onClick={() => go('speakers', s.id)}>
-                      {flag(s.country)} <strong>{s.nameEn}</strong>
+                      {flag(s.country)} <strong>{displayName(s)}</strong>
                       <div className="xsmall muted">{s.tier} · {s.attendanceMode}</div>
                     </td>
                     {types.map(t => {
@@ -147,7 +148,7 @@ export function Deliverables() {
             <tbody>
               {late.map(({ s, d }) => (
                 <tr key={d.id}>
-                  <td>{flag(s.country)} {s.nameEn}</td>
+                  <td>{flag(s.country)} {displayName(s)}</td>
                   <td>{d.type}</td>
                   <td className="num nowrap">{fmtDate(d.dueDate)}</td>
                   <td className="num"><Badge tone="critical">{ddayLabel(d.dueDate)}</Badge></td>

@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { activeConference, computeRisks, readiness } from '../lib/metrics'
 import { Avatar, Badge, Card, DL, Empty, StatusBadge, TierTag } from '../components/ui'
 import { daysBetween, ddayLabel, flag, fmtDate, fmtDateTime, krw, money, today, toneOf } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 import type { DeliverableStatus, PipelineStage, VisaStage } from '../types'
@@ -33,10 +34,10 @@ export function SpeakerDetail({ id }: { id: string }) {
     <>
       <div className="page-head">
         <div className="row" style={{ gap: 14, alignItems: 'flex-start' }}>
-          <Avatar name={sp.nameEn} size="lg" />
+          <Avatar name={displayName(sp)} size="lg" />
           <div>
             <div className="row-wrap" style={{ gap: 8 }}>
-              <h1 className="page-title">{flag(sp.country)} {sp.nameEn}</h1>
+              <h1 className="page-title">{flag(sp.country)} {displayName(sp)}</h1>
               <TierTag tier={sp.tier} />
               <StatusBadge status={sp.stage} />
               {sp.attendanceMode === '온라인' && <Badge tone="neutral">온라인 발표</Badge>}
@@ -380,7 +381,7 @@ export function SpeakerDetail({ id }: { id: string }) {
       {/* 인쇄용 개인 일정표 */}
       <div className="print-only">
         <h2>{conf.nameKo} — 개인 일정표 / Personal Itinerary</h2>
-        <p>{sp.nameEn} ({sp.affiliation}) · {sp.tier} · 담당 {liaison?.name} {liaison?.phone}</p>
+        <p>{displayName(sp)} ({sp.affiliation}) · {sp.tier} · 담당 {liaison?.name} {liaison?.phone}</p>
         <ul>
           {sp.flights.map(f => <li key={f.id}>{f.direction}: {f.flightNo} {f.from}→{f.to} {fmtDateTime(f.departAt)} ~ {fmtDateTime(f.arriveAt)}</li>)}
           {sp.hotel && <li>숙박: {sp.hotel.hotel} {fmtDate(sp.hotel.checkIn)}~{fmtDate(sp.hotel.checkOut)}</li>}

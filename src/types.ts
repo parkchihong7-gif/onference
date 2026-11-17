@@ -10,6 +10,43 @@ export type ISODateTime = string  // 2026-04-21T09:30
 
 export type Currency = 'KRW' | 'USD' | 'EUR' | 'JPY' | 'GBP' | 'SGD'
 
+/* ───────────────────────── 행사 성격 / 모듈 ─────────────────────────
+   설계 축이 둘이다.
+   ① 행사 축(scope)  — 국내 학회 / 국제 컨퍼런스. 활성 모듈과 메뉴 구성을 결정한다.
+   ② 참가자 축(residency) — 국내 연자 / 해외 연자. 출입국·해외송금·국제선은
+      '행사가 국제라서'가 아니라 '그 사람이 해외에서 와서' 붙는다.
+   따라서 국내 학회에 해외 연자가 1명 있어도, 국제 컨퍼런스에 국내 좌장이 있어도
+   초청→계약→교통→숙박→제출물→현장→정산의 공통 경로는 하나로 돌아간다. */
+
+export type ConferenceScope = '국내' | '국제'
+export type Residency = '국내' | '해외'
+export type Industry = '의료·학회' | '학술' | '기업' | '공공' | '협회'
+
+export type ModuleKey =
+  | '초청·연자'            // 공통 — 항상 활성
+  | '세션·프로그램'
+  | '제출물·콘텐츠'
+  | '교통·숙박'
+  | '현장운영'
+  | '정산·예산'
+  | '문서·회의록'
+  | '캘린더'
+  | '출입국·사증'          // 해외 연자가 1명이라도 있으면 활성
+  | '해외송금·조세조약'
+  | '의전'
+  | '연수평점'             // 국내 학회(의료·간호 등) 전용
+  | '초록심사'
+  | '참가등록'
+  | '후원·전시'
+
+export const CORE_MODULES: ModuleKey[] = [
+  '초청·연자', '세션·프로그램', '제출물·콘텐츠', '교통·숙박', '현장운영', '정산·예산', '문서·회의록', '캘린더',
+]
+/** 해외 연자가 있을 때만 의미가 있는 모듈 (현재 실행 검증 전 — Hold 표시) */
+export const OVERSEAS_MODULES: ModuleKey[] = ['출입국·사증', '해외송금·조세조약', '의전']
+/** 국내 학회에서 주로 쓰는 모듈 */
+export const DOMESTIC_MODULES: ModuleKey[] = ['연수평점', '초록심사', '참가등록', '후원·전시']
+
 /* ────────────────────────────── 조직 / 권한 ───────────────────────────── */
 
 export type RoleKey =
@@ -37,6 +74,13 @@ export type ConferenceStatus = '기획' | '준비' | '진행' | '종료'
 export interface Conference {
   id: ID
   code: string
+  /** 행사 성격 — 메뉴·용어·기본 모듈을 결정한다 */
+  scope: ConferenceScope
+  industry: Industry
+  /** 활성 모듈 (설정 화면에서 토글) */
+  modules: ModuleKey[]
+  /** 연수평점 인정 기관 (의료·간호 학회 등) */
+  creditAuthority?: string
   nameKo: string
   nameEn: string
   edition: string
@@ -125,7 +169,8 @@ export interface SupportPackage {
   id: ID
   name: string
   tier: SpeakerTier
-  airCabin: '이코노미' | '프리미엄이코노미' | '비즈니스' | '퍼스트'
+  /** 국제선 좌석 등급 또는 국내 교통 등급(KTX 특실 등) */
+  airCabin: string
   airTicketedBy: '주최발권' | '본인구매후정산'
   hotelNights: number
   hotelGrade: string
@@ -142,6 +187,7 @@ export interface SupportPackage {
 /* ────────────────────────────── 출입국 / 비자 ─────────────────────────── */
 
 export type VisaTrack =
+  | '국내(해당없음)'
   | '면제(무비자)'
   | 'K-ETA'
   | 'C-3-1 단기방문'
@@ -196,9 +242,14 @@ export interface VisaCase {
 
 /* ────────────────────────────── 여행 / 의전 ──────────────────────────── */
 
+/** 이동 수단 — 국제선·국내선·KTX·버스·자가용을 한 구조로 담는다 */
+export type TravelMode = '국제선' | '국내선' | 'KTX' | '고속버스' | '자가용' | '셔틀'
+
 export interface Flight {
   id: ID
-  direction: '입국' | '출국'
+  /** 국제: 입국/출국 · 국내: 출발/귀가 */
+  direction: '입국' | '출국' | '출발' | '귀가'
+  mode: TravelMode
   carrier: string
   flightNo: string
   from: string          // IATA
@@ -307,6 +358,9 @@ export type DeliverableType =
   | '거주자증명서(CoR)'
   | '해외송금 정보(W-8/은행)'
   | '여행자보험 정보'
+  | '강의계획서'                  // 연수평점 신청 근거
+  | '이해관계 선언(COI)'          // 의료·제약 관련 학회 필수
+  | '사례비 지급정보(통장·신분증)'
 
 export type DeliverableStatus = '요청전' | '요청함' | '제출' | '검수완료' | '반려' | '기한초과'
 
@@ -338,9 +392,18 @@ export interface Expense {
   spentAt?: ISODate
 }
 
+/** 사례비 소득 구분 — 국내 거주자와 비거주자의 원천징수 체계가 다르다 */
+export type TaxType =
+  | '사업소득(3.3%)'       // 국내 강연·자문 통상
+  | '기타소득(8.8%)'       // 일시적 원고·강연료
+  | '비거주자(22%)'        // 국내원천소득 원천징수
+  | '조세조약 제한세율'
+  | '비과세·면세'
+
 export interface Settlement {
   honorarium: number
   currency: Currency
+  taxType: TaxType
   /** 국내 지급 시 외국인 기타소득/사업소득 원천징수율(%) */
   withholdingRate: number
   taxTreatyApplied: boolean
@@ -416,6 +479,8 @@ export interface Speaker {
 
   /* 초청 조건 */
   tier: SpeakerTier
+  /** 국내/해외 — 출입국·해외송금·국제선 모듈의 적용 여부를 가른다 */
+  residency: Residency
   stage: PipelineStage
   /** 실제 참석 확정 여부 (초청 수락과 별도 관리) */
   attendance: AttendanceStatus
@@ -568,6 +633,147 @@ export interface AuditLog {
   memo?: string
 }
 
+/* ──────────────────── 국내 학회 전용 모듈 ──────────────────── */
+
+/** 연수평점 — 의료·간호 등 면허 직군 학회의 필수 과업 */
+export interface CreditProgram {
+  id: ID
+  conferenceId: ID
+  authority: string            // 인정 기관 (예: 대한의사협회)
+  category: string             // 평점 구분 (필수 / 선택 / 윤리 등)
+  appliedCredits: number
+  approvedCredits?: number
+  applicationNo?: string
+  sessionIds: ID[]
+  submittedAt?: ISODate
+  resultAt?: ISODate
+  status: '준비' | '신청' | '심사중' | '승인' | '보완요청' | '반려'
+  /** 평점 부여 조건 (출석 시간 등) */
+  condition?: string
+  ownerMemberId: ID
+  note?: string
+}
+
+/** 초록 투고·심사 */
+export interface Abstract {
+  id: ID
+  conferenceId: ID
+  code: string
+  title: string
+  authorName: string
+  affiliation: string
+  email: string
+  track: string
+  presentType: '구연' | '포스터' | '비디오'
+  submittedAt: ISODate
+  reviewerIds: ID[]
+  scores: number[]             // 심사위원 점수 (0~10)
+  status: '접수' | '심사중' | '채택' | '수정요청' | '반려' | '철회'
+  decisionAt?: ISODate
+  sessionId?: ID
+  awardNominated?: boolean
+  memo?: string
+}
+
+/** 참가 등록 (사전·현장) */
+export interface Registration {
+  id: ID
+  conferenceId: ID
+  name: string
+  affiliation: string
+  department?: string
+  licenseNo?: string           // 면허·회원 번호 (평점 부여용)
+  email: string
+  phone?: string
+  type: '정회원' | '준회원' | '비회원' | '전공의' | '학생' | '연자' | '스태프' | '후원사'
+  channel: '사전등록' | '현장등록' | '초청'
+  fee: number
+  paid: boolean
+  payMethod?: '카드' | '계좌이체' | '법인' | '면제'
+  registeredAt: ISODate
+  attended: boolean
+  badgePrinted: boolean
+  creditsEarned?: number
+  mealTicket?: boolean
+  memo?: string
+}
+
+/** 후원·전시 */
+export interface Sponsor {
+  id: ID
+  conferenceId: ID
+  company: string
+  tier: 'Diamond' | 'Platinum' | 'Gold' | 'Silver' | '부스only'
+  amount: number
+  contactName: string
+  contactEmail: string
+  boothNo?: string
+  boothSize?: string
+  contractStatus: '제안' | '협의' | '계약완료' | '입금완료' | '취소'
+  benefits: string[]
+  dueDate?: ISODate
+  ownerMemberId: ID
+  memo?: string
+}
+
+/* ──────────────────── 문서·협업 (노션형 기능) ──────────────────── */
+
+export type DocType = '회의록' | '기획안' | '공지' | '운영매뉴얼' | '체크리스트' | '보고서'
+
+export interface Doc {
+  id: ID
+  conferenceId: ID
+  type: DocType
+  title: string
+  /** 마크다운 본문 */
+  body: string
+  authorMemberId: ID
+  createdAt: ISODate
+  updatedAt: ISODate
+  tags: string[]
+  /** 연결된 엔터티 (연자·세션·업무 등) */
+  linked?: { type: string; id: ID; label: string }[]
+  pinned?: boolean
+}
+
+/** 문서 템플릿 — 회의록·공지 등을 같은 틀로 쌓는다 */
+export interface DocTemplate {
+  id: ID
+  name: string
+  type: DocType
+  body: string
+}
+
+export type CommentTarget = '연자' | '업무' | '문서' | '초록' | '후원' | '세션' | '등록'
+
+export interface Comment {
+  id: ID
+  conferenceId: ID
+  targetType: CommentTarget
+  targetId: ID
+  targetLabel: string
+  authorMemberId: ID
+  body: string
+  mentions: ID[]
+  createdAt: ISODateTime
+  resolved: boolean
+}
+
+/** 첨부 파일 대장 — 실물은 문서고/드라이브, 여기서는 위치와 권한을 관리 */
+export interface Attachment {
+  id: ID
+  conferenceId: ID
+  targetType: string
+  targetId: ID
+  name: string
+  kind: '문서' | '이미지' | '발표자료' | '계약서' | '증빙' | '기타'
+  location: string             // 보관 위치(경로·드라이브 링크 등)
+  sizeKB?: number
+  uploadedBy: ID
+  uploadedAt: ISODate
+  confidential: boolean
+}
+
 /* ────────────────────────────── 전체 상태 ────────────────────────────── */
 
 export interface AppState {
@@ -584,4 +790,14 @@ export interface AppState {
   mailTemplates: MailTemplate[]
   checklistTemplates: ChecklistTemplate[]
   auditLogs: AuditLog[]
+  /* 국내 학회 모듈 */
+  creditPrograms: CreditProgram[]
+  abstracts: Abstract[]
+  registrations: Registration[]
+  sponsors: Sponsor[]
+  /* 문서·협업 */
+  docs: Doc[]
+  docTemplates: DocTemplate[]
+  comments: Comment[]
+  attachments: Attachment[]
 }

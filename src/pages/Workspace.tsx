@@ -4,6 +4,7 @@ import { activeConference, buildItinerary, readiness, speakersOf, validateSpeake
 import type { DataIssue, ItineraryEvent } from '../lib/metrics'
 import { Badge, Card, DL, Empty, StatusBadge, TierTag } from '../components/ui'
 import { ddayLabel, flag, fmtDate, fmtDateTime, krw, money, toneOf } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import type { AttendanceStatus, Companion, Flight, Speaker } from '../types'
 
@@ -50,7 +51,7 @@ export function Workspace() {
     if (filter === '참석미정' && s.attendance !== '참석미정') return false
     if (filter === '비자대상' && !s.visa.required) return false
     if (filter === '자비참가' && s.sponsorship === 'Sponsored') return false
-    if (q && !`${s.nameEn} ${s.affiliation} ${s.country} ${s.email}`.toLowerCase().includes(q.toLowerCase())) return false
+    if (q && !`${displayName(s)} ${s.affiliation} ${s.country} ${s.email}`.toLowerCase().includes(q.toLowerCase())) return false
     return true
   }), [list, q, filter])
 
@@ -107,7 +108,7 @@ export function Workspace() {
                   <div className="ws-card" aria-selected={s.id === sp?.id} onClick={() => setSelected(s.id)}>
                     <div className="ws-card-name">
                       <span aria-hidden>{flag(s.country)}</span>
-                      <span className="trunc">{s.nameEn}</span>
+                      <span className="trunc">{displayName(s)}</span>
                       <span className="spacer" />
                       <Badge tone={s.attendance === '참석확정' ? 'good' : s.attendance === '참석미정' ? 'warning' : 'neutral'}>
                         {s.attendance}
@@ -197,7 +198,7 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
         <div className="row-wrap" style={{ justifyContent: 'space-between', gap: 12 }}>
           <div>
             <div className="row-wrap" style={{ gap: 8 }}>
-              <h2 style={{ fontSize: 19 }}>{flag(sp.country)} {sp.nameEn}</h2>
+              <h2 style={{ fontSize: 19 }}>{flag(sp.country)} {displayName(sp)}</h2>
               <TierTag tier={sp.tier} />
               <StatusBadge status={sp.stage} />
               <span className="chip">{sp.sponsorship}</span>

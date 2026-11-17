@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, Empty, Segmented, StatTile, StatusBadge } from '../components/ui'
 import { flag, fmtDate, fmtDateTime, krw, krwShort, money } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 
@@ -14,7 +15,7 @@ export function Travel() {
 
   const flights = list.flatMap(s => s.flights.map(f => ({ s, f }))).sort((a, b) =>
     (a.f.direction === '입국' ? a.f.arriveAt : a.f.departAt) < (b.f.direction === '입국' ? b.f.arriveAt : b.f.departAt) ? -1 : 1)
-  const arrivals = flights.filter(x => x.f.direction === '입국')
+  const arrivals = flights.filter(x => x.f.direction === '입국' || x.f.direction === '출발')
   const transfers = list.flatMap(s => s.transfers.map(t => ({ s, t }))).sort((a, b) => (a.t.at < b.t.at ? -1 : 1))
   const hotels = list.filter(s => s.hotel)
 
@@ -31,10 +32,10 @@ export function Travel() {
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">여행·의전 관리</h1>
+          <h1 className="page-title">교통·숙박·의전</h1>
           <p className="page-desc">
-            항공 발권, 숙박(루밍 리스트), 공항 픽업·샌딩 배차를 한 곳에서 관리합니다. 도착 시각 기준으로 배차와
-            담당 리에종을 배정하고, 여행사·PCO와 같은 데이터를 공유합니다.
+            국제선·국내선·KTX·자가용을 <strong>하나의 이동 레코드</strong>로 관리합니다. 숙박(루밍 리스트)과
+            픽업·샌딩 배차를 도착 시각 기준으로 배정하며, 여행사·PCO와 같은 데이터를 공유합니다.
           </p>
         </div>
         <div className="row-wrap no-print">
@@ -44,9 +45,9 @@ export function Travel() {
       </div>
 
       <div className="grid g4">
-        <StatTile label="발권 완료" value={`${list.filter(s => s.flights.some(f => f.eTicketReceived)).length}/${list.filter(s => s.attendanceMode !== '온라인' && ['수락', '계약완료'].includes(s.stage)).length}`}
+        <StatTile label="이동 확정" value={`${list.filter(s => s.flights.some(f => f.eTicketReceived)).length}/${list.filter(s => s.attendanceMode !== '온라인' && ['수락', '계약완료'].includes(s.stage)).length}`}
           foot="e-Ticket 수령 기준" tone="info" />
-        <StatTile label="항공 예산(약정)" value={krwShort(totalAir)} unit="원" foot={`원화 환산 합계 · ${krw(totalAir)}`} />
+        <StatTile label="교통 예산(약정)" value={krwShort(totalAir)} unit="원" foot={`원화 환산 합계 · ${krw(totalAir)}`} />
         <StatTile label="객실 확보" value={hotels.reduce((a, s) => a + s.hotel!.nights, 0)} unit="박"
           foot={`${hotels.length}명 · 예상 ${krwShort(totalHotel)}원`} />
         <StatTile label="배차 확정" value={`${transfers.filter(x => x.t.status === '확정').length}/${transfers.length}`}
@@ -55,22 +56,23 @@ export function Travel() {
 
       {view === '항공' && (
         <>
-          <Card title="입국 일정" sub="도착 순 정렬 · 배차 담당자와 미팅포인트 확인">
+          <Card title="도착 일정" sub="도착 순 정렬 · 배차 담당자와 미팅포인트 확인">
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th>도착</th><th>연사</th><th>편명</th><th>구간</th><th>클래스</th><th>PNR</th><th>발권</th><th>픽업</th></tr></thead>
+                <thead><tr><th>도착</th><th>연자</th><th>수단</th><th>편명</th><th>구간</th><th>등급</th><th>예약번호</th><th>상태</th><th>픽업</th></tr></thead>
                 <tbody>
                   {arrivals.map(({ s, f }) => {
                     const pickup = s.transfers.find(t => t.kind === '공항픽업')
                     return (
                       <tr key={f.id} className="clickable" onClick={() => go('speakers', s.id)}>
                         <td className="num nowrap"><strong>{fmtDateTime(f.arriveAt)}</strong></td>
-                        <td>{flag(s.country)} {s.nameEn}</td>
+                        <td>{s.residency === '해외' ? flag(s.country) : '🇰🇷'} {displayName(s)}</td>
+                        <td className="small nowrap">{f.mode}</td>
                         <td className="num">{f.flightNo}</td>
                         <td className="num">{f.from} → {f.to}</td>
                         <td className="small">{f.cabin}</td>
                         <td className="num small">{f.pnr ?? '-'}</td>
-                        <td><Badge tone={f.eTicketReceived ? 'good' : 'warning'}>{f.eTicketReceived ? '완료' : '미발권'}</Badge></td>
+                        <td><Badge tone={f.eTicketReceived || f.mode === '자가용' ? 'good' : 'warning'}>{f.mode === '자가용' ? '자차' : f.eTicketReceived ? '예약완료' : '미확정'}</Badge></td>
                         <td className="small">{pickup ? `${state.members.find(m => m.id === pickup.assignedMemberId)?.name} · ${pickup.status}` : '미배정'}</td>
                       </tr>
                     )
@@ -80,19 +82,20 @@ export function Travel() {
               </table>
             </div>
           </Card>
-          <Card title="전체 항공 여정">
+          <Card title="전체 이동 여정">
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th>구분</th><th>연사</th><th>편명</th><th>출발</th><th>도착</th><th>수하물</th><th>발권 주체</th><th className="right">운임</th></tr></thead>
+                <thead><tr><th>구분</th><th>연자</th><th>수단</th><th>편명</th><th>출발</th><th>도착</th><th>등급</th><th>예약 주체</th><th className="right">운임</th></tr></thead>
                 <tbody>
                   {flights.map(({ s, f }) => (
                     <tr key={f.id}>
-                      <td><Badge tone={f.direction === '입국' ? 'info' : 'neutral'}>{f.direction}</Badge></td>
-                      <td>{s.nameEn}</td>
+                      <td><Badge tone={['입국', '출발'].includes(f.direction) ? 'info' : 'neutral'}>{f.direction}</Badge></td>
+                      <td>{displayName(s)}</td>
+                      <td className="small nowrap">{f.mode}</td>
                       <td className="num">{f.flightNo}</td>
                       <td className="num nowrap small">{fmtDateTime(f.departAt)} · {f.from}</td>
                       <td className="num nowrap small">{fmtDateTime(f.arriveAt)} · {f.to}</td>
-                      <td className="small">{f.baggage ?? '-'}</td>
+                      <td className="small">{f.cabin}</td>
                       <td className="small">{f.ticketedBy}</td>
                       <td className="right num">{f.fare ? money(f.fare, f.currency) : '-'}</td>
                     </tr>
@@ -112,7 +115,7 @@ export function Travel() {
               <tbody>
                 {hotels.map(s => (
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
-                    <td>{flag(s.country)} {s.nameEn}{s.companions.length ? <span className="xsmall muted"> +동반 {s.companions.length}</span> : null}</td>
+                    <td>{flag(s.country)} {displayName(s)}{s.companions.length ? <span className="xsmall muted"> +동반 {s.companions.length}</span> : null}</td>
                     <td className="small">{s.tier}</td>
                     <td className="small">{s.hotel!.hotel}</td>
                     <td className="num nowrap">{fmtDate(s.hotel!.checkIn)}</td>
@@ -142,7 +145,7 @@ export function Travel() {
                     <tr key={t.id} className="clickable" onClick={() => go('speakers', s.id)}>
                       <td className="num nowrap">{fmtDateTime(t.at)}</td>
                       <td className="small nowrap">{t.kind}</td>
-                      <td>{flag(s.country)} {s.nameEn}</td>
+                      <td>{flag(s.country)} {displayName(s)}</td>
                       <td className="small trunc" style={{ maxWidth: 260 }}>{t.fromPlace} → {t.toPlace}</td>
                       <td className="small">{t.vehicle ?? '-'}</td>
                       <td className="small">{t.meetingPoint ?? '-'}</td>
@@ -162,7 +165,7 @@ export function Travel() {
                 <tbody>
                   {list.filter(s => s.dietary || s.accessibility || s.interpretationNeeded || s.companions.length).map(s => (
                     <tr key={s.id}>
-                      <td>{flag(s.country)} {s.nameEn}</td>
+                      <td>{flag(s.country)} {displayName(s)}</td>
                       <td className="small">{s.tier}</td>
                       <td className="small">{s.dietary ?? '-'}</td>
                       <td className="small">{s.accessibility ?? '-'}</td>

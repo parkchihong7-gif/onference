@@ -2,6 +2,7 @@ import { useApp } from '../store'
 import { activeConference, speakersOf, visaLeadDays, visaSlack } from '../lib/metrics'
 import { Badge, Card, StatTile, StatusBadge } from '../components/ui'
 import { flag, fmtDate, fmtDateTime } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 import type { VisaStage } from '../types'
@@ -11,7 +12,8 @@ const BOARD: VisaStage[] = ['판정대기', '서류요청', '서류수령', '초
 export function Visa() {
   const { state, dispatch } = useApp()
   const conf = activeConference(state)
-  const list = speakersOf(state).filter(s => !['거절', '취소'].includes(s.stage))
+  // 출입국 절차는 '해외에서 오는 연자'에게만 해당한다 (행사가 국제인지와 무관).
+  const list = speakersOf(state).filter(s => s.residency === '해외' && !['거절', '취소'].includes(s.stage))
   const visaCases = list.filter(s => s.visa.required)
   const waiver = list.filter(s => !s.visa.required && s.attendanceMode !== '온라인')
 
@@ -37,6 +39,14 @@ export function Visa() {
         <button className="btn no-print" onClick={exportCsv}>⬇ 진행현황 내보내기</button>
       </div>
 
+      <div className="alert alert-warning no-print">
+        <span aria-hidden>⚠</span>
+        <span>
+          <strong>검증 전 모듈(Hold)</strong> — 사증·사증발급인정서 절차는 실제 신청 사례로 검증·테스트되지 않았습니다.
+          화면과 판정 로직은 "이렇게 구현된다"를 보여 주는 수준이며, 실제 집행 전 출입국·외국인청 및 관할 재외공관 안내를 확인해야 합니다.
+        </span>
+      </div>
+
       <div className="grid g4">
         <StatTile label="비자 필요" value={visaCases.length} unit="명" foot={`${new Set(visaCases.map(s => s.country)).size}개국`} />
         <StatTile label="발급 완료" value={visaCases.filter(s => s.visa.stage === '발급완료').length} unit="명" tone="good"
@@ -58,7 +68,7 @@ export function Visa() {
                   <div className="kanban-card" key={s.id} onClick={() => go('speakers', s.id)}>
                     <div className="row" style={{ gap: 6 }}>
                       <span aria-hidden>{flag(s.country)}</span>
-                      <strong className="small trunc" style={{ flex: 1 }}>{s.nameEn}</strong>
+                      <strong className="small trunc" style={{ flex: 1 }}>{displayName(s)}</strong>
                     </div>
                     <div className="xsmall muted">{s.visa.track}</div>
                     <div className="row-wrap" style={{ gap: 4, marginTop: 5 }}>
@@ -82,7 +92,7 @@ export function Visa() {
             <tbody>
               {visaCases.map(s => (
                 <tr key={s.id}>
-                  <td className="clickable" onClick={() => go('speakers', s.id)}><strong>{s.nameEn}</strong><div className="xsmall muted">{s.affiliation}</div></td>
+                  <td className="clickable" onClick={() => go('speakers', s.id)}><strong>{displayName(s)}</strong><div className="xsmall muted">{s.affiliation}</div></td>
                   <td className="nowrap">{flag(s.country)} {s.country}</td>
                   <td className="small nowrap">{s.visa.track}</td>
                   <td><StatusBadge status={s.visa.stage} /></td>
@@ -117,7 +127,7 @@ export function Visa() {
               <tbody>
                 {waiver.map(s => (
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
-                    <td>{s.nameEn}</td>
+                    <td>{displayName(s)}</td>
                     <td className="nowrap">{flag(s.country)} {s.country}</td>
                     <td className="small">{s.visa.track}</td>
                     <td>{s.visa.ketaRequired ? <StatusBadge status={s.visa.ketaStatus ?? '신청전'} /> : <span className="muted small">해당없음</span>}</td>

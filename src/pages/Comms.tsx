@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { activeConference, commsOf, speakersOf } from '../lib/metrics'
 import { Badge, Card, Drawer, StatTile, StatusBadge } from '../components/ui'
 import { fmtDate, fmtDateTime, flag, today } from '../lib/format'
+import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import type { MailTemplate } from '../types'
 
@@ -61,7 +62,7 @@ export function Comms() {
                   const sp = state.speakers.find(s => s.id === c.speakerId)
                   return (
                     <tr key={c.id}>
-                      <td className="clickable" onClick={() => sp && go('speakers', sp.id)}>{sp ? `${flag(sp.country)} ${sp.nameEn}` : '-'}</td>
+                      <td className="clickable" onClick={() => sp && go('speakers', sp.id)}>{sp ? `${flag(sp.country)} ${displayName(sp)}` : '-'}</td>
                       <td className="small">{c.subject}</td>
                       <td className="num small nowrap">{fmtDateTime(c.sentAt)}</td>
                       <td className="num small nowrap"><Badge tone="critical">{fmtDate(c.followUpAt)}</Badge></td>
@@ -113,7 +114,7 @@ export function Comms() {
                   <tr key={c.id}>
                     <td className="num small nowrap">{fmtDateTime(c.sentAt)}</td>
                     <td><Badge tone={c.direction === '수신' ? 'info' : 'neutral'}>{c.direction}</Badge></td>
-                    <td className="small nowrap clickable" onClick={() => sp && go('speakers', sp.id)}>{sp ? `${flag(sp.country)} ${sp.nameEn}` : '-'}</td>
+                    <td className="small nowrap clickable" onClick={() => sp && go('speakers', sp.id)}>{sp ? `${flag(sp.country)} ${displayName(sp)}` : '-'}</td>
                     <td className="small">{c.channel}</td>
                     <td className="small trunc" style={{ maxWidth: 360 }}>{c.subject}</td>
                     <td className="small nowrap">{state.members.find(m => m.id === c.byMemberId)?.name}</td>
@@ -149,7 +150,7 @@ export function Comms() {
               <Card title="발송 시뮬레이션" sub="실제 메일 발송은 연동되지 않으며, 로그만 기록됩니다">
                 <div className="row-wrap">
                   <select className="select" value={target} onChange={e => setTarget(e.target.value)}>
-                    {list.map(s => <option key={s.id} value={s.id}>{s.nameEn} · {s.stage}</option>)}
+                    {list.map(s => <option key={s.id} value={s.id}>{displayName(s)} · {s.stage}</option>)}
                   </select>
                   <button className="btn btn-primary" onClick={() => send(preview)}>✉ 발송 기록 추가</button>
                 </div>
