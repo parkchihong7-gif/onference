@@ -55,3 +55,20 @@ fs.writeFileSync(TARGET, html)
 fs.rmSync(OUT_DIR, { recursive: true, force: true })
 const kb = (fs.statSync(TARGET).size / 1024).toFixed(0)
 console.log(`✓ ${TARGET} 생성 완료 (${kb} KB · 외부 파일 의존성 없음)`)
+
+/* ── 아티팩트(웹 링크) 배포본 ──────────────────────────────────────────────
+   아티팩트는 publish 시점에 <!doctype>/<html>/<head>/<body> 를 스스로 감싸므로
+   본문 요소만 담은 변형을 따로 만든다. 제목·스타일·스크립트만 포함한다. */
+const ARTIFACT_DIR = 'artifact'
+const ARTIFACT = `${ARTIFACT_DIR}/onference.html`
+fs.mkdirSync(ARTIFACT_DIR, { recursive: true })
+const artifactHtml = [
+  '<title>ONFERENCE 행사 관리</title>',
+  `<style>\n${css}\n</style>`,
+  '<div id="root"></div>',
+  `<script>\n${js}\n</script>`,
+  '',
+].join('\n')
+fs.writeFileSync(ARTIFACT, artifactHtml)
+const akb = (fs.statSync(ARTIFACT).size / 1024).toFixed(0)
+console.log(`✓ ${ARTIFACT} 생성 완료 (${akb} KB · 아티팩트 게시용)`)

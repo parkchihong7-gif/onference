@@ -58,6 +58,33 @@
   --shadow-lg: 0 10px 30px rgba(0,0,0,.6);
 }
 
+/* 시스템 테마가 다크인 뷰어(명시적 선택 없음)에서도 다크 팔레트를 적용한다 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --surface-3: #2c2c2a;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --ink-3: #898781;
+  --line: #2c2c2a;
+  --line-strong: #383835;
+  --nav: #131312;
+  --nav-ink: #e9e8e1;
+  --nav-ink-2: #898781;
+  --nav-active: #262624;
+
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --good-bg: #16301a; --warning-bg: #33280c; --serious-bg: #331f16; --critical-bg: #331616;
+  --info-bg: #14243a; --neutral-bg: #262623;
+  --shadow: 0 1px 2px rgba(0,0,0,.5);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,.6);
+}
+}
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
@@ -117,14 +144,16 @@ table { border-collapse: collapse; width: 100%; }
 .card-title { font-size: 14px; font-weight: 650; }
 .card-sub { font-size: 12px; color: var(--ink-3); }
 .grid { display: grid; gap: 14px; }
+/* 그리드/플렉스 자식이 콘텐츠 때문에 트랙을 넓히지 못하게 한다 */
+.grid > *, .card { min-width: 0; }
 .g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .g5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .g23 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 .g32 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
-@media (max-width: 1280px) { .g5, .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g23, .g32, .g3 { grid-template-columns: 1fr; } }
-@media (max-width: 860px) { .app { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .g2 { grid-template-columns: 1fr; } }
+@media (max-width: 1280px) { .g5, .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g23, .g32, .g3 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 860px) { .app { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .g2 { grid-template-columns: minmax(0, 1fr); } }
 
 .row { display: flex; align-items: center; gap: 8px; }
 .row-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -361,3 +390,40 @@ table.data tr.clickable { cursor: pointer; }
 :root[data-theme='dark'] .issue-오류 { color: #f08585; }
 :root[data-theme='dark'] .issue-경고 { color: #fac95f; }
 :root[data-theme='dark'] .issue-확인 { color: #7fb4f2; }
+
+
+/* ─────────────── 내보내기 복사 패널 (파일 저장이 막힌 환경용) ─────────────── */
+#onf-copy-panel { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; }
+.onf-copy-scrim { position: absolute; inset: 0; background: rgba(11,11,11,.45); }
+.onf-copy-box {
+  position: relative; width: min(760px, 92vw); max-height: 82vh; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.onf-copy-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.onf-copy-sub { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+#onf-copy-panel textarea {
+  flex: 1; min-height: 260px; border: 0; resize: none; padding: 12px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6;
+  background: var(--surface); color: var(--ink);
+}
+#onf-copy-panel textarea:focus { outline: none; }
+.onf-copy-foot { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface-2); }
+
+/* ─────────────── 폰 폭(≈400px) 대응 — 가로 스크롤 방지 ─────────────── */
+@media (max-width: 620px) {
+  /* 1fr 은 minmax(auto,1fr) 이라 콘텐츠 최소 너비에 밀려 트랙이 커진다.
+     폰 폭에서는 트랙이 줄어들 수 있도록 minmax(0,1fr) 로 고정한다. */
+  .g5, .g4, .g3, .g2, .g23, .g32 { grid-template-columns: minmax(0, 1fr); }
+  .page { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .topbar { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  /* 라벨-값 2열 그리드는 한 줄로 풀어 내용이 밀려나지 않게 한다 */
+  .dl { grid-template-columns: 1fr; gap: 2px 0; }
+  .dl dt { margin-top: 8px; }
+  .gantt-row { grid-template-columns: 1fr; gap: 4px; }
+  .tl-item { grid-template-columns: 64px 12px minmax(0, 1fr); }
+  .tl-item::before { left: 67px; }
+  .ws-list { max-height: none; }
+  .select, .input { max-width: 100%; }
+  .topbar .select { flex: 1 1 160px; }
+}

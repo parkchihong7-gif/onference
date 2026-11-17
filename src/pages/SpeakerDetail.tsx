@@ -5,6 +5,7 @@ import { Avatar, Badge, Card, DL, Empty, StatusBadge, TierTag } from '../compone
 import { daysBetween, ddayLabel, flag, fmtDate, fmtDateTime, krw, money, today, toneOf } from '../lib/format'
 import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
+import { CAN_PRINT } from '../lib/env'
 import { PIPELINE_ORDER } from '../types'
 import type { DeliverableStatus, PipelineStage, VisaStage } from '../types'
 
@@ -51,7 +52,7 @@ export function SpeakerDetail({ id }: { id: string }) {
         </div>
         <div className="row-wrap no-print">
           <button className="btn" onClick={() => go('speakers')}>← 목록</button>
-          <button className="btn" onClick={() => window.print()}>🖨 개인 일정표 인쇄</button>
+          {CAN_PRINT && <button className="btn" onClick={() => window.print()}>🖨 개인 일정표 인쇄</button>}
           <select className="select" value={sp.stage}
             onChange={e => dispatch({ type: 'SET_STAGE', id: sp.id, stage: e.target.value as PipelineStage })}>
             {[...PIPELINE_ORDER, '거절', '취소'].map(s => <option key={s} value={s}>{s}</option>)}

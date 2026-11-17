@@ -6,6 +6,7 @@ import { Comments } from '../components/Comments'
 import { Markdown, extractActionItems } from '../lib/markdown'
 import { fmtDate, today } from '../lib/format'
 import { go } from '../lib/router'
+import { CAN_PRINT } from '../lib/env'
 import type { DocType, PhaseKey } from '../types'
 
 const TYPES: DocType[] = ['회의록', '기획안', '공지', '운영매뉴얼', '체크리스트', '보고서']
@@ -136,7 +137,7 @@ export function Docs() {
                       </>
                     ) : (
                       <>
-                        <button className="btn" onClick={() => window.print()}>🖨 인쇄</button>
+                        {CAN_PRINT && <button className="btn" onClick={() => window.print()}>🖨 인쇄</button>}
                         <button className="btn btn-primary" onClick={() => { setDraft(doc.body); setEditing(true) }}>편집</button>
                       </>
                     )}

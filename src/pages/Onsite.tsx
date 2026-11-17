@@ -5,6 +5,7 @@ import { Badge, Card, StatTile } from '../components/ui'
 import { flag, fmtDate, fmtDateTime } from '../lib/format'
 import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
+import { CAN_PRINT } from '../lib/env'
 import type { Speaker } from '../types'
 
 type Step = keyof Pick<Speaker['onsite'], 'arrivedAirportAt' | 'hotelCheckedInAt' | 'venueCheckInAt' | 'presentedAt' | 'departedAt'>
@@ -46,7 +47,7 @@ export function Onsite() {
             배지·기념품 전달, 테크 리허설, 비상 연락망을 함께 관리합니다.
           </p>
         </div>
-        <button className="btn no-print" onClick={() => window.print()}>🖨 런시트 인쇄</button>
+        {CAN_PRINT && <button className="btn no-print" onClick={() => window.print()}>🖨 런시트 인쇄</button>}
       </div>
 
       <div className="grid g5">
