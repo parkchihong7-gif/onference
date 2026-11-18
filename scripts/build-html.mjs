@@ -9,12 +9,24 @@ import react from '@vitejs/plugin-react'
 import fs from 'node:fs'
 import path from 'node:path'
 
+
 const OUT_DIR = 'dist-single'
 const TARGET = 'onference-dashboard.html'
 
 await build({
   configFile: false,
-  plugins: [react()],
+  plugins: [
+    react(),
+    // 단일 HTML 은 항상 1인 모드이므로 공유 백엔드(Firebase SDK)를 번들에서 제외한다
+    {
+      name: 'onference-stub-shared-backend',
+      enforce: 'pre',
+      resolveId(source) {
+        if (source.includes('data/firebaseBackend')) return path.resolve('scripts/firebaseBackend.stub.ts')
+        return null
+      },
+    },
+  ],
   base: './',
   build: {
     outDir: OUT_DIR,
@@ -47,7 +59,8 @@ html = html
   // IIFE(클래식 스크립트)는 defer 가 없으므로 body 끝에서 실행되도록 배치한다.
   .replace('</body>', () => `  <script>\n${js}\n  </script>\n  </body>`)
 
-if (before === html || html.includes('app.js') || html.includes('app.css')) {
+// 번들 본문에 'app.js' 문자열이 들어 있을 수 있으므로(동적 import 경로 심), 태그 속성만 확인한다
+if (before === html || /src="[^"]*app\.js"/.test(html) || /href="[^"]*app\.css"/.test(html)) {
   throw new Error('인라인 치환 실패 — 빌드 산출물 파일명을 확인하세요.')
 }
 

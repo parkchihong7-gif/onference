@@ -40,7 +40,8 @@ npm run preview     # 빌드 결과 미리보기
 npm run build:html  # 단일 HTML 파일(onference-dashboard.html) 재생성
 ```
 
-- 서버·DB 없이 브라우저에서 동작하며, 상태는 `localStorage` 에 저장된다.
+- 기본은 서버 없이 브라우저에서 동작한다(1인 모드). **Firestore 를 연결하면 담당자 여러 명이
+  같은 데이터를 실시간으로 함께 쓰는 공동 작업 모드**가 된다 — [`docs/07_공동작업_백엔드.md`](docs/07_공동작업_백엔드.md)
 - 처음 실행하면 데모 행사(제12회 국제 스마트시티·AI 컨퍼런스, 해외 연사 17명)가 시드로 로드된다.
 - `행사 설정·템플릿 > 데모 데이터 초기화` 로 언제든 초기 상태로 되돌릴 수 있다.
 
@@ -92,6 +93,7 @@ bash deploy/deploy-cloudrun.sh
 - [`docs/04_리서치노트.md`](docs/04_리서치노트.md) — 해외 연사 초청 부가 업무 리서치 및 확장 백로그
 - [`docs/05_점검리포트.md`](docs/05_점검리포트.md) — 전체 프로세스 재검토 결과(발견 오류 15건·수정 내역·보강 항목)
 - [`docs/06_국내외_확장_재설계.md`](docs/06_국내외_확장_재설계.md) — v2.0 국내외 확장 재설계(모듈 체계·국내 학회 모듈·노션 기능 내재화)
+- [`docs/07_공동작업_백엔드.md`](docs/07_공동작업_백엔드.md) — v3.0 공동 작업 백엔드(Firestore 구조·역할별 권한·검증)
 
 ## 기술 구성
 
@@ -109,6 +111,10 @@ src/
   data/seed.ts      데모 시드(행사·연사·세션·업무·템플릿·이력)
   data/base.ts      시드 공용 유틸(기준일·상대 날짜·결정적 난수)
   data/seedDomestic.ts  국내 학회(병원 학회) 시드
+  config.ts         실행 설정(config.json) — 있으면 공유 모드, 없으면 1인 모드
+  data/mutations.ts 액션 → 문서 변경 변환 (두 백엔드 공용)
+  data/backend.ts   로컬 백엔드 · 백엔드 인터페이스
+  data/firebaseBackend.ts  Firestore 실시간 구독·쓰기·초대
   lib/              format · scope(국내외 분기) · metrics(리스크/정합성/KPI) · markdown · csv · router
   components/ui.tsx 카드·배지·테이블·도넛·퍼널·간트 등 공통 UI
   pages/            21개 화면 (모듈 활성 여부에 따라 노출)

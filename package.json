@@ -11,16 +11,24 @@
     "typecheck": "tsc --noEmit",
     "build:html": "node scripts/build-html.mjs",
     "serve": "node deploy/server.mjs dist",
-    "gcp-build": "npm run build"
+    "gcp-build": "npm run build",
+    "seed:export": "node scripts/export-seed.mjs",
+    "seed:firestore": "npm run seed:export && node scripts/seed-firestore.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project onference-rules-test \"node scripts/test-rules.mjs\""
   },
   "dependencies": {
+    "firebase": "^11.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "esbuild": "^0.24.2",
+    "firebase-admin": "^13.0.2",
+    "firebase-tools": "^13.29.1",
     "typescript": "^5.7.3",
     "vite": "^7.0.0"
   }

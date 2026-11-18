@@ -29,6 +29,14 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregi
   --project "${PROJECT_ID}" --quiet
 
 ENV_ARGS=()
+# 공유 백엔드(Firestore) 설정 — 지정하면 팀 공동 작업 모드로 뜬다
+if [[ -n "${FIREBASE_API_KEY:-}" && -n "${FIREBASE_PROJECT_ID:-}" && -n "${FIREBASE_APP_ID:-}" ]]; then
+  echo "▶ 공유 백엔드(Firestore) 설정을 포함해 배포합니다: ${FIREBASE_PROJECT_ID}"
+  ENV_ARGS+=(--set-env-vars "FIREBASE_API_KEY=${FIREBASE_API_KEY},FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID},FIREBASE_APP_ID=${FIREBASE_APP_ID},FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN:-${FIREBASE_PROJECT_ID}.firebaseapp.com}${ALLOWED_DOMAIN:+,ALLOWED_DOMAIN=${ALLOWED_DOMAIN}}")
+else
+  echo "▶ 공유 백엔드 설정이 없어 1인(로컬 저장) 모드로 배포합니다."
+fi
+
 if [[ -n "${AUTH_USER:-}" && -n "${AUTH_PASS:-}" ]]; then
   echo "▶ Basic 인증을 켠 상태로 배포합니다 (사용자: ${AUTH_USER})"
   ENV_ARGS+=(--set-env-vars "AUTH_USER=${AUTH_USER},AUTH_PASS=${AUTH_PASS}")

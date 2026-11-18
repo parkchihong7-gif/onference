@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useApp } from '../store'
+import type { Invite } from '../data/backend'
 import { activeConference } from '../lib/metrics'
 import { Badge, Card, DL, StatTile } from '../components/ui'
 import { CORE_MODULES, DOMESTIC_MODULES, OVERSEAS_MODULES } from '../types'
@@ -6,9 +8,38 @@ import { needsOverseasModules } from '../lib/scope'
 import type { ModuleKey } from '../types'
 import { fmtDate, krw } from '../lib/format'
 
+const ROLES = ['사무국', 'PCO', '리에종', '여행사', '재무', '연사'] as const
+
 export function Settings() {
-  const { state, dispatch } = useApp()
+  const { state, dispatch, status, invites } = useApp()
   const conf = activeConference(state)
+  const [inviteList, setInviteList] = useState<Invite[]>([])
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [role, setRole] = useState<string>('리에종')
+  const [msg, setMsg] = useState('')
+  const canInvite = invites.supported && status.user?.role === '사무국'
+
+  useEffect(() => {
+    if (!invites.supported) return
+    invites.list().then(setInviteList).catch(() => setInviteList([]))
+  }, [invites])
+
+  const addInvite = async () => {
+    if (!email.includes('@')) { setMsg('이메일 형식을 확인하세요.'); return }
+    try {
+      await invites.add({ email, name: name || email.split('@')[0], role, org: '' })
+      setInviteList(await invites.list())
+      setEmail(''); setName(''); setMsg('초대했습니다. 해당 계정으로 로그인하면 바로 접근됩니다.')
+    } catch (e) { setMsg(`초대 실패: ${String(e)}`) }
+  }
+
+  const revoke = async (target: string) => {
+    try {
+      await invites.revoke(target)
+      setInviteList(await invites.list())
+    } catch (e) { setMsg(`회수 실패: ${String(e)}`) }
+  }
 
   const reset = () => {
     if (confirm('로컬 저장 데이터를 초기 시드 상태로 되돌립니다. 계속할까요?')) dispatch({ type: 'RESET' })
@@ -36,6 +67,81 @@ export function Settings() {
           foot={`${state.checklistTemplates.length}개 템플릿`} />
         <StatTile label="구성원" value={state.members.length} unit="명" foot={`${new Set(state.members.map(m => m.role)).size}개 역할`} />
       </div>
+
+      <Card title="데이터 저장 방식"
+        sub={status.mode === '공유' ? '여러 담당자가 같은 데이터를 실시간으로 함께 봅니다' : '이 브라우저에만 저장됩니다'}>
+        <div className="row-wrap" style={{ gap: 10, marginBottom: 12 }}>
+          <Badge tone={status.mode === '공유' ? 'good' : 'warning'}>
+            {status.mode === '공유' ? '공유 백엔드 연결됨' : '1인 모드(로컬 저장)'}
+          </Badge>
+          {status.mode === '공유' && status.user && (
+            <span className="chip">{status.user.name} · {status.user.role} · {status.user.email}</span>
+          )}
+          {status.pending > 0 && <span className="chip">저장 대기 {status.pending}건</span>}
+          {status.error && <Badge tone="critical">{status.error}</Badge>}
+        </div>
+        {status.mode === '로컬' ? (
+          <div className="alert alert-warning">
+            <span aria-hidden>⚠</span>
+            <span>
+              <strong>지금은 공동 작업이 되지 않습니다.</strong> 입력한 내용이 이 브라우저에만 남아
+              다른 담당자에게 보이지 않습니다. 서버에 Firestore 설정을 넣어 배포하면 같은 화면이
+              공유 모드로 전환됩니다 — <code>deploy/GOOGLE_CLOUD.md</code> 의 "공동 작업 설정" 참고.
+            </span>
+          </div>
+        ) : (
+          <div className="alert alert-info">
+            <span aria-hidden>ℹ</span>
+            <span>
+              모든 변경은 문서 단위로 저장되어 다른 담당자 화면에 즉시 반영됩니다.
+              역할에 따라 수정할 수 있는 영역이 다릅니다(여행사는 교통·숙박, 재무는 정산 등).
+            </span>
+          </div>
+        )}
+      </Card>
+
+      {invites.supported && (
+        <Card title="구성원 · 접근 권한"
+          sub={canInvite ? '초대한 구글 계정만 이 데이터를 열 수 있습니다' : '초대 관리는 사무국 권한에서만 가능합니다'}>
+          {canInvite && (
+            <div className="row-wrap no-print" style={{ marginBottom: 12 }}>
+              <input className="input" style={{ flex: '2 1 220px' }} placeholder="초대할 구글 계정 이메일"
+                value={email} onChange={e => setEmail(e.target.value)} />
+              <input className="input" style={{ flex: '1 1 140px' }} placeholder="이름(선택)"
+                value={name} onChange={e => setName(e.target.value)} />
+              <select className="select" value={role} onChange={e => setRole(e.target.value)}>
+                {ROLES.map(r => <option key={r}>{r}</option>)}
+              </select>
+              <button className="btn btn-primary" onClick={() => void addInvite()}>＋ 초대</button>
+            </div>
+          )}
+          {msg && <div className="small sec" style={{ marginBottom: 10 }}>{msg}</div>}
+          <div className="table-wrap">
+            <table className="data">
+              <thead><tr><th>이메일</th><th>이름</th><th>역할</th><th>상태</th>{canInvite && <th className="no-print">관리</th>}</tr></thead>
+              <tbody>
+                {inviteList.map(iv => {
+                  const joined = state.members.some(m => m.email === iv.email)
+                  return (
+                    <tr key={iv.email}>
+                      <td className="small">{iv.email}</td>
+                      <td className="small">{iv.name}</td>
+                      <td><Badge tone="neutral">{iv.role}</Badge></td>
+                      <td>{joined ? <Badge tone="good">사용 중</Badge> : <Badge tone="warning">초대됨(미접속)</Badge>}</td>
+                      {canInvite && (
+                        <td className="no-print">
+                          <button className="btn btn-sm" onClick={() => void revoke(iv.email)}>회수</button>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+                {!inviteList.length && <tr><td colSpan={5} className="empty">초대된 계정이 없습니다.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <Card title="모듈 구성" sub="행사 성격에 따라 기본값이 적용되며, 필요에 따라 켜고 끌 수 있습니다">
         <div className="grid g3">

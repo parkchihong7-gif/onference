@@ -5,6 +5,7 @@ import { activeConference, computeRisks, kpis, speakersOf, tasksOf, validateAll 
 import { hasModule, labelsOf, needsOverseasModules, overseasSpeakers } from './lib/scope'
 import { ddayLabel, today } from './lib/format'
 import { Search } from './components/Search'
+import { AuthGate } from './components/AuthGate'
 import { Dashboard } from './pages/Dashboard'
 import { Pipeline } from './pages/Pipeline'
 import { Workspace } from './pages/Workspace'
@@ -61,7 +62,7 @@ const NAV: NavDef[] = [
 ]
 
 export function App() {
-  const { state, dispatch } = useApp()
+  const { state, dispatch, status, signOut } = useApp()
   const route = useRoute()
   const conf = activeConference(state)
   const labels = labelsOf(conf)
@@ -105,6 +106,7 @@ export function App() {
   const nav = (key: string) => visible.some(n => n.key === key)
 
   return (
+    <AuthGate>
     <div className="app">
       <nav className="sidebar">
         <div className="brand">
@@ -154,9 +156,22 @@ export function App() {
           {counts.risks > 0 && (
             <button className="badge t-critical" style={{ cursor: 'pointer' }} onClick={() => go('risks')}>⚠ 위험 {counts.risks}건</button>
           )}
-          <select className="select" value={state.currentUserId} onChange={e => dispatch({ type: 'SET_USER', id: e.target.value })} aria-label="사용자(권한) 선택">
-            {state.members.map(m => <option key={m.id} value={m.id}>{m.name} · {m.role}</option>)}
-          </select>
+          {status.mode === '공유' ? (
+            <>
+              <span className="badge t-good no-dot" title={`${status.user?.email ?? ''} · 변경이 모든 담당자에게 실시간 반영됩니다`}>
+                👥 공유 · {status.user?.name}{status.user?.role ? ` (${status.user.role})` : ''}
+              </span>
+              {status.pending > 0 && <span className="chip nowrap" title="저장 대기 중">저장 중 {status.pending}</span>}
+              <button className="btn btn-sm" onClick={() => void signOut()}>로그아웃</button>
+            </>
+          ) : (
+            <>
+              <span className="chip nowrap" title="이 브라우저에만 저장됩니다. 공동 작업하려면 공유 백엔드를 연결하세요.">🔒 1인 모드</span>
+              <select className="select" value={state.currentUserId} onChange={e => dispatch({ type: 'SET_USER', id: e.target.value })} aria-label="사용자(권한) 선택">
+                {state.members.map(m => <option key={m.id} value={m.id}>{m.name} · {m.role}</option>)}
+              </select>
+            </>
+          )}
           <button className="btn btn-sm" onClick={toggleTheme} title="다크 모드 전환">{theme === 'dark' ? '☀' : '☾'}</button>
         </header>
 
@@ -192,5 +207,6 @@ export function App() {
 
       <Search open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
+    </AuthGate>
   )
 }

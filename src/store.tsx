@@ -1,13 +1,14 @@
-import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  Abstract, AppState, AuditLog, Comment, Communication, CreditProgram, Deliverable, Doc,
+  Abstract, AppState, Comment, Communication, CreditProgram, Deliverable, Doc,
   ModuleKey, PipelineStage, Registration, Speaker, Sponsor, Task, VisaStage,
 } from './types'
 import { initialState } from './data/seed'
-import { today } from './lib/format'
-
-const STORAGE_KEY = 'onference.state.v1'
+import { LocalBackend } from './data/backend'
+import type { Backend, BackendStatus, Invite } from './data/backend'
+import { applyMutations, isLocalOnly, mutationsFor } from './data/mutations'
+import { hasSharedBackend, loadConfig } from './config'
 
 export type Action =
   | { type: 'SET_CONFERENCE'; id: string }
@@ -31,208 +32,95 @@ export type Action =
   | { type: 'TOGGLE_MODULE'; conferenceId: string; module: ModuleKey }
   | { type: 'RESET' }
 
-/** 감사 로그 시각은 실제 시각, 업무 일자는 데모 기준일(today())을 사용한다 */
-const now = () => new Date().toISOString().slice(0, 16)
-const bizDate = () => today()
 
-function log(state: AppState, entry: Omit<AuditLog, 'id' | 'at' | 'actor'>): AuditLog {
-  const actor = state.members.find(m => m.id === state.currentUserId)?.name ?? '시스템'
-  return { id: `AL-${Math.random().toString(36).slice(2, 9)}`, at: now(), actor, ...entry }
-}
+/* ───────────────────────────── 저장소(Provider) ─────────────────────────────
+   화면은 dispatch 만 호출한다. 액션은 Mutation 으로 바뀌어
+   로컬 저장소 또는 공유 백엔드(Firestore)에 동일하게 적용된다. */
 
-function reducer(state: AppState, action: Action): AppState {
-  switch (action.type) {
-    case 'SET_CONFERENCE':
-      return { ...state, activeConferenceId: action.id }
-
-    case 'SET_USER':
-      return { ...state, currentUserId: action.id }
-
-    case 'PATCH_SPEAKER': {
-      const sp = state.speakers.find(s => s.id === action.id)
-      if (!sp) return state
-      const logs = action.audit
-        ? [log(state, { action: '수정', entityType: '연사', entityId: sp.id, entityLabel: sp.nameEn, ...action.audit }), ...state.auditLogs]
-        : state.auditLogs
-      return {
-        ...state,
-        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, ...action.patch, updatedAt: bizDate() } : s)),
-        auditLogs: logs,
-      }
-    }
-
-    case 'SET_STAGE': {
-      const sp = state.speakers.find(s => s.id === action.id)
-      if (!sp || sp.stage === action.stage) return state
-      const patch: Partial<Speaker> = { stage: action.stage }
-      if (action.stage === '수락' && !sp.acceptedAt) patch.acceptedAt = bizDate()
-      if (action.stage === '계약완료') { patch.agreementStatus = '서명완료'; patch.agreementSignedAt = bizDate() }
-      if (action.stage === '거절') patch.declinedAt = bizDate()
-      return {
-        ...state,
-        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, ...patch, updatedAt: bizDate() } : s)),
-        auditLogs: [log(state, { action: '단계변경', entityType: '연사', entityId: sp.id, entityLabel: sp.nameEn, field: '파이프라인 단계', before: sp.stage, after: action.stage }), ...state.auditLogs],
-      }
-    }
-
-    case 'SET_VISA_STAGE': {
-      const sp = state.speakers.find(s => s.id === action.id)
-      if (!sp) return state
-      const visa = { ...sp.visa, stage: action.stage }
-      if (action.stage === '발급완료' && !visa.issuedAt) visa.issuedAt = bizDate()
-      return {
-        ...state,
-        speakers: state.speakers.map(s => (s.id === action.id ? { ...s, visa, updatedAt: bizDate() } : s)),
-        auditLogs: [log(state, { action: '수정', entityType: '비자', entityId: sp.id, entityLabel: sp.nameEn, field: '비자 단계', before: sp.visa.stage, after: action.stage }), ...state.auditLogs],
-      }
-    }
-
-    case 'PATCH_DELIVERABLE': {
-      const sp = state.speakers.find(s => s.id === action.speakerId)
-      const dv = sp?.deliverables.find(d => d.id === action.deliverableId)
-      if (!sp || !dv) return state
-      return {
-        ...state,
-        speakers: state.speakers.map(s =>
-          s.id !== sp.id ? s : { ...s, deliverables: s.deliverables.map(d => (d.id === dv.id ? { ...d, ...action.patch } : d)) },
-        ),
-        auditLogs: action.patch.status
-          ? [log(state, { action: '수정', entityType: '제출물', entityId: sp.id, entityLabel: sp.nameEn, field: dv.type, before: dv.status, after: action.patch.status }), ...state.auditLogs]
-          : state.auditLogs,
-      }
-    }
-
-    case 'PATCH_TASK': {
-      const t = state.tasks.find(x => x.id === action.id)
-      if (!t) return state
-      const sp = state.speakers.find(s => s.id === t.speakerId)
-      return {
-        ...state,
-        tasks: state.tasks.map(x => (x.id === action.id ? { ...x, ...action.patch } : x)),
-        auditLogs: action.patch.status
-          ? [log(state, { action: '수정', entityType: '업무', entityId: t.id, entityLabel: `${sp ? sp.nameEn + ' · ' : ''}${t.title}`, field: '업무 상태', before: t.status, after: action.patch.status }), ...state.auditLogs]
-          : state.auditLogs,
-      }
-    }
-
-    case 'ADD_TASK':
-      return { ...state, tasks: [action.task, ...state.tasks] }
-
-    case 'ADD_COMM': {
-      const sp = state.speakers.find(s => s.id === action.comm.speakerId)
-      return {
-        ...state,
-        communications: [action.comm, ...state.communications],
-        auditLogs: [log(state, { action: '발송', entityType: '커뮤니케이션', entityId: action.comm.speakerId, entityLabel: sp?.nameEn ?? '-', field: action.comm.subject, after: action.comm.status }), ...state.auditLogs],
-      }
-    }
-
-    case 'ADD_DOC':
-      return {
-        ...state, docs: [action.doc, ...state.docs],
-        auditLogs: [log(state, { action: '생성', entityType: '업무', entityId: action.doc.id, entityLabel: action.doc.title, field: action.doc.type, after: '문서 생성' }), ...state.auditLogs],
-      }
-
-    case 'UPDATE_DOC': {
-      const doc = state.docs.find(d => d.id === action.id)
-      if (!doc) return state
-      return {
-        ...state,
-        docs: state.docs.map(d => (d.id === action.id ? { ...d, ...action.patch, updatedAt: bizDate() } : d)),
-        auditLogs: [log(state, { action: '수정', entityType: '업무', entityId: doc.id, entityLabel: doc.title, field: '문서 내용', after: '수정됨' }), ...state.auditLogs],
-      }
-    }
-
-    case 'DELETE_DOC':
-      return { ...state, docs: state.docs.filter(d => d.id !== action.id) }
-
-    case 'ADD_COMMENT':
-      return { ...state, comments: [action.comment, ...state.comments] }
-
-    case 'TOGGLE_COMMENT':
-      return { ...state, comments: state.comments.map(c => (c.id === action.id ? { ...c, resolved: !c.resolved } : c)) }
-
-    case 'PATCH_ABSTRACT': {
-      const a = state.abstracts.find(x => x.id === action.id)
-      if (!a) return state
-      return {
-        ...state,
-        abstracts: state.abstracts.map(x => (x.id === action.id ? { ...x, ...action.patch } : x)),
-        auditLogs: action.patch.status
-          ? [log(state, { action: '수정', entityType: '제출물', entityId: a.id, entityLabel: `${a.code} ${a.title.slice(0, 20)}`, field: '초록 심사 상태', before: a.status, after: action.patch.status }), ...state.auditLogs]
-          : state.auditLogs,
-      }
-    }
-
-    case 'PATCH_REGISTRATION':
-      return { ...state, registrations: state.registrations.map(r => (r.id === action.id ? { ...r, ...action.patch } : r)) }
-
-    case 'PATCH_SPONSOR': {
-      const sp = state.sponsors.find(x => x.id === action.id)
-      if (!sp) return state
-      return {
-        ...state,
-        sponsors: state.sponsors.map(x => (x.id === action.id ? { ...x, ...action.patch } : x)),
-        auditLogs: action.patch.contractStatus
-          ? [log(state, { action: '수정', entityType: '행사', entityId: sp.id, entityLabel: sp.company, field: '후원 계약 상태', before: sp.contractStatus, after: action.patch.contractStatus }), ...state.auditLogs]
-          : state.auditLogs,
-      }
-    }
-
-    case 'PATCH_CREDIT': {
-      const c = state.creditPrograms.find(x => x.id === action.id)
-      if (!c) return state
-      return {
-        ...state,
-        creditPrograms: state.creditPrograms.map(x => (x.id === action.id ? { ...x, ...action.patch } : x)),
-        auditLogs: action.patch.status
-          ? [log(state, { action: '수정', entityType: '행사', entityId: c.id, entityLabel: `${c.authority} ${c.category}`, field: '평점 신청 상태', before: c.status, after: action.patch.status }), ...state.auditLogs]
-          : state.auditLogs,
-      }
-    }
-
-    case 'TOGGLE_MODULE': {
-      const conf = state.conferences.find(c => c.id === action.conferenceId)
-      if (!conf) return state
-      const on = conf.modules.includes(action.module)
-      return {
-        ...state,
-        conferences: state.conferences.map(c => (c.id !== conf.id ? c : {
-          ...c, modules: on ? c.modules.filter(m => m !== action.module) : [...c.modules, action.module],
-        })),
-        auditLogs: [log(state, { action: '수정', entityType: '행사', entityId: conf.id, entityLabel: conf.nameKo, field: `모듈 · ${action.module}`, before: on ? '활성' : '비활성', after: on ? '비활성' : '활성' }), ...state.auditLogs],
-      }
-    }
-
-    case 'RESET':
-      return initialState
-
-    default:
-      return state
+interface Ctx {
+  state: AppState
+  dispatch: (action: Action) => void
+  status: BackendStatus
+  signIn: () => Promise<void>
+  signOut: () => Promise<void>
+  reset: () => Promise<void>
+  /** 공유 모드 전용 — 구성원 초대 관리 */
+  invites: {
+    supported: boolean
+    list: () => Promise<Invite[]>
+    add: (invite: Invite) => Promise<void>
+    revoke: (email: string) => Promise<void>
   }
 }
 
-function load(): AppState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return initialState
-    const parsed = JSON.parse(raw) as AppState
-    if (parsed.version !== initialState.version) return initialState
-    return parsed
-  } catch {
-    return initialState
-  }
-}
-
-interface Ctx { state: AppState; dispatch: React.Dispatch<Action> }
 const AppCtx = createContext<Ctx | null>(null)
 
+const LOCAL_STATUS: BackendStatus = { mode: '로컬', connected: true, needsSignIn: false, pending: 0 }
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, load)
+  const [state, setState] = useState<AppState>(initialState)
+  const [status, setStatus] = useState<BackendStatus>(LOCAL_STATUS)
+  const backendRef = useRef<Backend | null>(null)
+  const stateRef = useRef<AppState>(initialState)
+  stateRef.current = state
+
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { /* 저장 실패는 무시(내부 데모) */ }
-  }, [state])
-  const value = useMemo(() => ({ state, dispatch }), [state])
+    let disposed = false
+    let backend: Backend
+    ;(async () => {
+      const config = await loadConfig()
+      if (hasSharedBackend(config)) {
+        // 공유 백엔드 모듈은 설정이 있을 때만 불러온다(로컬 전용 빌드의 용량을 늘리지 않기 위해)
+        const { FirebaseBackend } = await import('./data/firebaseBackend')
+        backend = new FirebaseBackend(config)
+      } else {
+        backend = new LocalBackend()
+      }
+      if (disposed) return
+      backendRef.current = backend
+      await backend.start(
+        s => setState(s),
+        st => setStatus(st),
+      )
+    })().catch((e: unknown) => {
+      setStatus({ mode: '로컬', connected: true, needsSignIn: false, pending: 0, error: `설정 로딩 실패: ${String(e)}` })
+      const local = new LocalBackend()
+      backendRef.current = local
+      void local.start(s => setState(s), st => setStatus(st))
+    })
+    return () => { disposed = true; backendRef.current?.stop() }
+  }, [])
+
+  const dispatch = useCallback((action: Action) => {
+    // 화면 전환·사용자 선택처럼 저장이 필요 없는 액션
+    if (isLocalOnly(action)) {
+      if (action.type === 'SET_CONFERENCE') setState(s => ({ ...s, activeConferenceId: action.id }))
+      else if (action.type === 'SET_USER') setState(s => ({ ...s, currentUserId: action.id }))
+      else if (action.type === 'RESET') void backendRef.current?.reset?.()
+      return
+    }
+    const muts = mutationsFor(stateRef.current, action)
+    if (!muts.length) return
+    // 낙관적 반영 — 공유 모드에서도 즉시 화면이 바뀌고, 이후 서버 스냅샷으로 교정된다
+    setState(s => applyMutations(s, muts))
+    backendRef.current?.write(muts).catch((e: unknown) => {
+      setStatus(st => ({ ...st, error: `저장 실패: ${String(e)}` }))
+    })
+  }, [])
+
+  const signIn = useCallback(async () => { await backendRef.current?.signIn?.() }, [])
+  const signOut = useCallback(async () => { await backendRef.current?.signOut?.() }, [])
+  const reset = useCallback(async () => { await backendRef.current?.reset?.() }, [])
+
+  const invites = useMemo(() => ({
+    supported: status.mode === '공유',
+    list: async () => (await backendRef.current?.listInvites?.()) ?? [],
+    add: async (invite: Invite) => { await backendRef.current?.invite?.(invite) },
+    revoke: async (email: string) => { await backendRef.current?.revokeInvite?.(email) },
+  }), [status.mode])
+
+  const value = useMemo<Ctx>(() => ({ state, dispatch, status, signIn, signOut, reset, invites }),
+    [state, dispatch, status, signIn, signOut, reset, invites])
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>
 }
 

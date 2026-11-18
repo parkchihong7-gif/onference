@@ -85,11 +85,63 @@ gcloud app deploy app.yaml
 
 ---
 
+## 공동 작업 설정 (Firestore) — 담당자 여러 명이 함께 쓰기
+
+위 배포만으로는 **각자 브라우저에만 저장**된다. 팀이 같은 데이터를 보려면 Firestore 를 붙인다.
+같은 GCP 프로젝트 안에서 끝나고, 추가 서버는 없다.
+
+### 1) Firestore 와 로그인 준비 (콘솔에서 한 번)
+
+1. 콘솔 → **Firestore** → 데이터베이스 만들기 → **Native 모드** → 리전 `asia-northeast3`
+2. 콘솔 → **Firebase** 에서 같은 프로젝트를 Firebase 로 추가(기존 GCP 프로젝트 선택)
+3. Firebase 콘솔 → 빌드 → **Authentication** → 시작하기 → **Google** 공급자 사용 설정
+4. Firebase 콘솔 → 프로젝트 설정 → 내 앱 → **웹 앱 추가** → 표시되는 설정값 중
+   `apiKey` / `appId` 를 메모한다
+
+### 2) 보안 규칙과 초기 데이터 올리기 (Cloud Shell)
+
+```bash
+cd onference
+npm ci
+
+# 역할별 접근 규칙 배포
+npx firebase deploy --only firestore:rules --project <프로젝트ID>
+
+# 초기 데이터 + 관리자 초대 (본인 구글 계정 이메일을 적는다)
+npm run seed:export
+node scripts/seed-firestore.mjs --project <프로젝트ID> --admin you@example.org
+```
+
+> 데모 데이터 없이 **빈 상태**로 시작하려면 `--empty` 를 붙인다.
+> 이미 운영 중인 데이터를 지우고 다시 넣으려면 `--wipe` (주의해서 사용).
+
+### 3) 설정을 넣어 다시 배포
+
+```bash
+FIREBASE_API_KEY='AIza...' FIREBASE_PROJECT_ID='<프로젝트ID>' FIREBASE_APP_ID='1:123...:web:abc...' ALLOWED_DOMAIN='example.org' bash deploy/deploy-cloudrun.sh
+```
+
+`ALLOWED_DOMAIN` 은 선택이다(지정하면 해당 도메인 계정만 로그인 가능).
+배포 후 주소를 열면 **구글 계정 로그인 화면**이 뜨고, 초대된 계정만 들어갈 수 있다.
+
+### 4) 담당자 추가
+
+앱에서 **행사 설정 · 모듈 → 구성원 · 접근 권한** 에서 이메일과 역할을 지정해 초대한다.
+초대된 사람이 그 구글 계정으로 로그인하면 바로 접근된다. 역할별로 고칠 수 있는 범위가 다르다
+(여행사는 교통·숙박, 재무는 정산 등 — 자세한 내용은 `docs/07_공동작업_백엔드.md`).
+
+### 비용
+
+Firestore 무료 한도는 하루 읽기 5만·쓰기 2만 건이다. 담당자 10여 명이 상시 열어 두어도
+이 규모의 행사 데이터(수천 건)로는 한도 안쪽이다.
+
+---
+
 ## 운영 메모
 
-- **데이터는 서버에 저장되지 않는다.** 접속한 사람의 브라우저(localStorage)에 남는다.
-  따라서 서버 백업 대상이 없고, 같은 주소를 보더라도 담당자 간 자동 동기화는 되지 않는다.
-  공동 편집이 필요해지는 시점이 DB(예: Firestore)를 붙일 시점이다.
+- **저장 위치**: Firestore 를 연결하면 데이터가 서버에 저장되고 모든 담당자가 실시간으로 공유한다.
+  연결하지 않으면 접속한 사람의 브라우저에만 남는다(1인 모드). 화면 상단에 현재 모드가 표시된다.
+- **백업**: Firestore 는 콘솔에서 내보내기(Export)를 예약할 수 있다. 중요한 행사 전후로 걸어 두면 좋다.
 - **비용**: Cloud Run 은 요청이 없으면 인스턴스가 0으로 내려가 과금이 사실상 발생하지 않는다
   (`--min-instances 0` 으로 배포된다). Firebase/App Engine 도 소규모면 무료 한도 안이다.
 - **리전**: 기본값은 서울(`asia-northeast3`). 바꾸려면 `REGION=asia-northeast1` 처럼 지정한다.

@@ -63,6 +63,28 @@ function authorized(req) {
   return safeEqual(decoded.slice(0, i), USER) && safeEqual(decoded.slice(i + 1), PASS)
 }
 
+/**
+ * 배포 환경 설정을 /config.json 으로 내려 준다.
+ * 환경변수가 없으면 빈 설정을 반환하고, 앱은 로컬(1인) 모드로 동작한다.
+ * 같은 이미지를 환경변수만 바꿔 여러 프로젝트에 쓸 수 있다.
+ */
+function runtimeConfig() {
+  const fb = {
+    apiKey: process.env.FIREBASE_API_KEY ?? '',
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || `${process.env.FIREBASE_PROJECT_ID ?? ''}.firebaseapp.com`,
+    projectId: process.env.FIREBASE_PROJECT_ID ?? '',
+    appId: process.env.FIREBASE_APP_ID ?? '',
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET ?? '',
+    messagingSenderId: process.env.FIREBASE_SENDER_ID ?? '',
+  }
+  const ready = fb.apiKey && fb.projectId && fb.appId
+  return {
+    ...(ready ? { firebase: fb } : {}),
+    allowedDomain: process.env.ALLOWED_DOMAIN || undefined,
+    environmentLabel: process.env.ENVIRONMENT_LABEL || undefined,
+  }
+}
+
 const server = createServer((req, res) => {
   if (!authorized(req)) {
     res.writeHead(401, {
@@ -77,6 +99,16 @@ const server = createServer((req, res) => {
   }
 
   const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0])
+
+  if (urlPath === '/config.json') {
+    const body = JSON.stringify(runtimeConfig())
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Length': Buffer.byteLength(body),
+      'Cache-Control': 'no-store',
+    })
+    return res.end(req.method === 'HEAD' ? undefined : body)
+  }
   // 상위 경로 탈출 방지
   const rel = normalize(urlPath).replace(/^(\.\.[/\\])+/, '').replace(/^[/\\]+/, '')
   let file = join(ROOT, rel)

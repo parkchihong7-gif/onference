@@ -1,0 +1,96 @@
+rules_version = '2';
+
+/**
+ * ONFERENCE 접근 규칙
+ *
+ * 원칙
+ *  1) members/{uid} 문서가 있는 계정만 읽을 수 있다(초대제).
+ *  2) 역할별로 쓸 수 있는 컬렉션·필드를 제한한다.
+ *  3) 변경 이력(auditLogs)은 생성만 가능하고 수정·삭제할 수 없다.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function member() { return get(/databases/$(database)/documents/members/$(request.auth.uid)).data; }
+    function isMember() { return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid)); }
+    function role() { return isMember() ? member().role : ''; }
+    function isAny(roles) { return isMember() && role() in roles; }
+    function admin() { return isAny(['사무국']); }
+
+    /** 이번 수정이 지정한 필드만 건드렸는가 */
+    function onlyKeys(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(keys.concat(['_updatedAt', '_updatedBy', 'updatedAt']));
+    }
+
+    // 초대장 — 사무국이 이메일로 미리 등록해 두면, 첫 로그인 때 본인이 멤버 문서를 만든다
+    match /memberInvites/{email} {
+      allow read: if signedIn() && request.auth.token.email == email;
+      allow write: if admin();
+    }
+
+    // 구성원 — 조회는 모든 멤버, 변경은 사무국만
+    match /members/{uid} {
+      allow read: if isMember() || (signedIn() && request.auth.uid == uid);
+      // 첫 로그인 시 초대장에 적힌 역할 그대로만 생성할 수 있다
+      allow create: if signedIn() && request.auth.uid == uid
+                    && exists(/databases/$(database)/documents/memberInvites/$(request.auth.token.email))
+                    && request.resource.data.role == get(/databases/$(database)/documents/memberInvites/$(request.auth.token.email)).data.role;
+      allow update, delete: if admin();
+    }
+
+    // 행사·세션·템플릿 — 사무국과 PCO가 관리
+    match /conferences/{id} { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO']); }
+    match /sessions/{id}    { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO']); }
+    match /supportPackages/{id}    { allow read: if isMember(); allow write: if admin(); }
+    match /checklistTemplates/{id} { allow read: if isMember(); allow write: if admin(); }
+    match /mailTemplates/{id}      { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO']); }
+    match /docTemplates/{id}       { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO']); }
+
+    // 연자 — 역할별로 수정 가능한 영역을 나눈다
+    match /speakers/{id} {
+      allow read: if isMember();
+      allow create, delete: if isAny(['사무국', 'PCO']);
+      allow update: if isAny(['사무국', 'PCO', '리에종'])
+                    || (isAny(['여행사']) && onlyKeys(['flights', 'hotel', 'transfers']))
+                    || (isAny(['재무'])   && onlyKeys(['settlement']));
+    }
+
+    // 업무·커뮤니케이션·문서·코멘트 — 실무 담당자들이 공동 작성
+    match /tasks/{id}          { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO', '리에종', '여행사', '재무']); }
+    match /communications/{id} { allow read: if isMember(); allow create, update: if isAny(['사무국', 'PCO', '리에종']); allow delete: if admin(); }
+    match /docs/{id}           { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO', '리에종', '재무']); }
+    match /comments/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.authorMemberId == request.auth.uid;
+      // 본인 코멘트 수정 · 해결 처리는 누구나
+      allow update: if isMember() && (resource.data.authorMemberId == request.auth.uid
+                                      || onlyKeys(['resolved']));
+      allow delete: if admin() || (isMember() && resource.data.authorMemberId == request.auth.uid);
+    }
+    match /attachments/{id} { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO', '리에종', '재무']); }
+
+    // 학회 운영 모듈
+    match /abstracts/{id}      { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO']); }
+    match /registrations/{id}  { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO', '재무']); }
+    match /sponsors/{id}       { allow read: if isMember(); allow write: if isAny(['사무국', '재무']); }
+    match /creditPrograms/{id} { allow read: if isMember(); allow write: if isAny(['사무국', 'PCO']); }
+
+    // 변경 이력 — 기록만 가능(수정·삭제 불가)
+    match /auditLogs/{id} {
+      allow read: if isMember();
+      allow create: if isMember();
+      allow update, delete: if false;
+    }
+
+    // 접속 표시 — 본인 문서만 기록
+    match /presence/{uid} {
+      allow read: if isMember();
+      allow write: if isMember() && request.auth.uid == uid;
+    }
+
+    // 그 외 경로는 모두 차단
+    match /{document=**} { allow read, write: if false; }
+  }
+}
