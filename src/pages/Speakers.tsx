@@ -3,7 +3,7 @@ import { useApp } from '../store'
 import { activeConference, readiness, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatusBadge, TierTag } from '../components/ui'
 import { flag, fmtDate, krwShort, toneOf } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 import { NewSpeakerDialog } from '../components/Create'
@@ -14,6 +14,7 @@ const STAGES = ['전체', '후보발굴', '내부승인', '사전타진', '공�
 export function Speakers() {
   const { state } = useApp()
   const conf = activeConference(state)
+  const labels = labelsOf(conf)
   const all = speakersOf(state)
   const [q, setQ] = useState('')
   const [stage, setStage] = useState<string>('전체')
@@ -47,7 +48,7 @@ export function Speakers() {
         r.score, s.settlement.honorarium, s.settlement.withholdingRate, s.email,
       ]
     })
-    downloadCsv(`${conf.code}_연사목록_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
+    downloadCsv(`${conf.code}_${labels.speaker}목록_${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
   }
 
   return (
@@ -55,7 +56,7 @@ export function Speakers() {
       <NewSpeakerDialog open={adding} onClose={() => setAdding(false)} />
       <div className="page-head">
         <div>
-          <h1 className="page-title">연사·초청자 관리</h1>
+          <h1 className="page-title">{labels.speaker}·초청자 관리</h1>
           <p className="page-desc">
             초청자 마스터. 한 사람의 초청·계약·출입국·여행·제출물·정산 데이터를 단일 레코드로 관리하며,
             모든 변경은 이력에 자동 기록됩니다. 목록은 Excel 호환(CSV/UTF-8 BOM)으로 내보낼 수 있습니다.
@@ -64,7 +65,7 @@ export function Speakers() {
         <div className="row-wrap no-print">
           <button className="btn" onClick={exportCsv}>⬇ Excel 내보내기</button>
           <button className="btn" onClick={() => go('pipeline')}>파이프라인 보기</button>
-          <button className="btn btn-primary" onClick={() => setAdding(true)}>＋ 연자 추가</button>
+          <button className="btn btn-primary" onClick={() => setAdding(true)}>＋ {labels.speaker} 추가</button>
         </div>
       </div>
 
@@ -92,13 +93,13 @@ export function Speakers() {
           <table className="data">
             <thead>
               <tr>
-                <th>연사</th><th>등급</th><th>단계</th><th>참석</th><th>지원</th><th>담당</th>
+                <th>{labels.speaker}</th><th>등급</th><th>단계</th><th>참석</th><th>지원</th><th>담당</th>
                 <th>입국/비자</th><th>항공·숙박</th><th>제출물</th><th>준비도</th><th className="right">강연료</th><th>수정</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(s => <Row key={s.id} s={s} liaisonName={state.members.find(m => m.id === s.liaisonMemberId)?.name ?? '-'} />)}
-              {!rows.length && <tr><td colSpan={11} className="empty">조건에 맞는 연사가 없습니다.</td></tr>}
+              {!rows.length && <tr><td colSpan={11} className="empty">조건에 맞는 {labels.speaker}가 없습니다.</td></tr>}
             </tbody>
           </table>
         </div>

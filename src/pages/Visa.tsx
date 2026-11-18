@@ -2,7 +2,7 @@ import { useApp } from '../store'
 import { activeConference, speakersOf, visaLeadDays, visaSlack } from '../lib/metrics'
 import { Badge, Card, StatTile, StatusBadge } from '../components/ui'
 import { flag, fmtDate, fmtDateTime } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 import type { VisaStage } from '../types'
@@ -11,6 +11,7 @@ const BOARD: VisaStage[] = ['판정대기', '서류요청', '서류수령', '초
 
 export function Visa() {
   const { state, dispatch } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   // 출입국 절차는 '해외에서 오는 연자'에게만 해당한다 (행사가 국제인지와 무관).
   const list = speakersOf(state).filter(s => s.residency === '해외' && !['거절', '취소'].includes(s.stage))
@@ -21,7 +22,7 @@ export function Visa() {
   const slack = (s: typeof list[number]) => visaSlack(s, conf)
 
   const exportCsv = () => downloadCsv(`${conf.code}_비자진행현황.csv`, [
-    ['연사', '국적', '사증종류', '단계', '인정서', '공관', '예약일시', '접수일', '발급일', '예상소요(일)', '여유(일)'],
+    [labels.speaker, '국적', '사증종류', '단계', '인정서', '공관', '예약일시', '접수일', '발급일', '예상소요(일)', '여유(일)'],
     ...visaCases.map(s => [s.nameEn, s.country, s.visa.track, s.visa.stage, s.visa.ccviRequired ? 'Y' : 'N',
       s.visa.consulate, s.visa.appointmentAt, s.visa.submittedAt, s.visa.issuedAt, need(s), slack(s)]),
   ])
@@ -33,7 +34,7 @@ export function Visa() {
           <h1 className="page-title">출입국·비자 관리</h1>
           <p className="page-desc">
             국적별 사증 종류 판정(C-3-1 단기방문 / C-3-4 단기상용 / C-4 단기취업)과 사증발급인정서(CCVI) 진행,
-            K-ETA 대상 여부, 여권 유효기간을 함께 관리합니다. 강연료를 지급받는 연사는 체류자격 판정을 별도로 확인해야 합니다.
+            K-ETA 대상 여부, 여권 유효기간을 함께 관리합니다. 강연료를 지급받는 {labels.speaker}는 체류자격 판정을 별도로 확인해야 합니다.
           </p>
         </div>
         <button className="btn no-print" onClick={exportCsv}>⬇ 진행현황 내보내기</button>
@@ -57,7 +58,7 @@ export function Visa() {
           tone="critical" foot="리드타임 역산 기준 · 즉시 조치 대상" />
       </div>
 
-      <Card title="비자 진행 보드" sub="단계별 인원 (칸을 클릭하면 해당 연사 상세로 이동)">
+      <Card title="비자 진행 보드" sub={`단계별 인원 (칸을 클릭하면 해당 ${labels.speaker} 상세로 이동)`}>
         <div className="kanban">
           {BOARD.map(stage => {
             const cards = visaCases.filter(s => s.visa.stage === stage)
@@ -87,7 +88,7 @@ export function Visa() {
         <div className="table-wrap">
           <table className="data">
             <thead>
-              <tr><th>연사</th><th>국적</th><th>사증 종류</th><th>단계</th><th>인정서</th><th>공관</th><th>영사 예약</th><th>여권 만료</th><th className="right">필요일</th><th className="right">여유</th><th className="no-print">단계 변경</th></tr>
+              <tr><th>{labels.speaker}</th><th>국적</th><th>사증 종류</th><th>단계</th><th>인정서</th><th>공관</th><th>영사 예약</th><th>여권 만료</th><th className="right">필요일</th><th className="right">여유</th><th className="no-print">단계 변경</th></tr>
             </thead>
             <tbody>
               {visaCases.map(s => (
@@ -123,7 +124,7 @@ export function Visa() {
         <Card title="무비자·K-ETA 대상" sub="사증은 면제되나 전자여행허가·입국 서류 확인이 필요합니다">
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>연사</th><th>국적</th><th>구분</th><th>K-ETA</th><th>여권 만료</th><th>입국 예정</th></tr></thead>
+              <thead><tr><th>{labels.speaker}</th><th>국적</th><th>구분</th><th>K-ETA</th><th>여권 만료</th><th>입국 예정</th></tr></thead>
               <tbody>
                 {waiver.map(s => (
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
@@ -143,7 +144,7 @@ export function Visa() {
         <Card title="실무 기준 메모" sub="국가·정책 변동 시 설정에서 갱신">
           <ul className="small sec" style={{ paddingLeft: 18, margin: 0, lineHeight: 1.85 }}>
             <li><strong>체류자격 판정</strong> — 강연료·사례비를 수령하면 단순 방문(C-3-1)이 아닌 단기취업(C-4) 대상이 될 수 있어 사전 확인이 필요합니다.</li>
-            <li><strong>사증발급인정서(CCVI)</strong> — 초청자(주최기관)가 국내 출입국·외국인청에 신청하며, 발급 후 연사가 현지 공관에서 사증을 받습니다. 심사에 통상 2~3주가 소요됩니다.</li>
+            <li><strong>사증발급인정서(CCVI)</strong> — 초청자(주최기관)가 국내 출입국·외국인청에 신청하며, 발급 후 {labels.speaker}가 현지 공관에서 사증을 받습니다. 심사에 통상 2~3주가 소요됩니다.</li>
             <li><strong>필수 서류</strong> — 초청장, 초청사유서, 신원보증서, 사업자등록증, 행사 개요·프로그램, 재직증명서, 여권 사본.</li>
             <li><strong>여권 유효기간</strong> — 입국일 기준 6개월 이상 잔여를 권고하며, 미달 시 갱신 후 서류를 재수취합니다.</li>
             <li><strong>K-ETA</strong> — 사증 면제 대상 국적자의 전자여행허가로, 면제 대상국은 정책에 따라 변동되므로 매 행사 시 확인이 필요합니다.</li>

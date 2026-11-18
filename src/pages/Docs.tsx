@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useApp } from '../store'
+import { useApp, useEnsure } from '../store'
 import { activeConference } from '../lib/metrics'
 import { Badge, Card, Empty } from '../components/ui'
 import { Comments } from '../components/Comments'
@@ -13,6 +13,7 @@ const TYPES: DocType[] = ['회의록', '기획안', '공지', '운영매뉴얼',
 
 export function Docs() {
   const { state, dispatch } = useApp()
+  useEnsure(['comments', 'attachments'])
   const conf = activeConference(state)
   const docs = useMemo(
     () => state.docs.filter(d => d.conferenceId === conf.id).sort((a, b) => (a.pinned === b.pinned ? (a.updatedAt < b.updatedAt ? 1 : -1) : a.pinned ? -1 : 1)),

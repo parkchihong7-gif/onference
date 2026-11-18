@@ -3,12 +3,13 @@ import { useApp } from '../store'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, Empty, Segmented, StatTile, StatusBadge } from '../components/ui'
 import { flag, fmtDate, fmtDateTime, krw, krwShort, money } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 
 export function Travel() {
   const { state } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const list = speakersOf(state).filter(s => !['거절', '취소'].includes(s.stage))
   const [view, setView] = useState<'항공' | '숙박' | '의전·배차'>('항공')
@@ -59,7 +60,7 @@ export function Travel() {
           <Card title="도착 일정" sub="도착 순 정렬 · 배차 담당자와 미팅포인트 확인">
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th>도착</th><th>연자</th><th>수단</th><th>편명</th><th>구간</th><th>등급</th><th>예약번호</th><th>상태</th><th>픽업</th></tr></thead>
+                <thead><tr><th>도착</th><th>{labels.speaker}</th><th>수단</th><th>편명</th><th>구간</th><th>등급</th><th>예약번호</th><th>상태</th><th>픽업</th></tr></thead>
                 <tbody>
                   {arrivals.map(({ s, f }) => {
                     const pickup = s.transfers.find(t => t.kind === '공항픽업')
@@ -85,7 +86,7 @@ export function Travel() {
           <Card title="전체 이동 여정">
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th>구분</th><th>연자</th><th>수단</th><th>편명</th><th>출발</th><th>도착</th><th>등급</th><th>예약 주체</th><th className="right">운임</th></tr></thead>
+                <thead><tr><th>구분</th><th>{labels.speaker}</th><th>수단</th><th>편명</th><th>출발</th><th>도착</th><th>등급</th><th>예약 주체</th><th className="right">운임</th></tr></thead>
                 <tbody>
                   {flights.map(({ s, f }) => (
                     <tr key={f.id}>
@@ -111,7 +112,7 @@ export function Travel() {
         <Card title="루밍 리스트" sub="호텔 제출용 · Excel 내보내기 지원">
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>연사</th><th>등급</th><th>호텔</th><th>체크인</th><th>체크아웃</th><th>박</th><th>객실</th><th>정산</th><th>예약번호</th><th>요청</th></tr></thead>
+              <thead><tr><th>{labels.speaker}</th><th>등급</th><th>호텔</th><th>체크인</th><th>체크아웃</th><th>박</th><th>객실</th><th>정산</th><th>예약번호</th><th>요청</th></tr></thead>
               <tbody>
                 {hotels.map(s => (
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
@@ -139,7 +140,7 @@ export function Travel() {
           <Card title="배차 스케줄" sub="시간 순 · 차량/기사/미팅포인트/담당자">
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th>일시</th><th>구분</th><th>연사</th><th>구간</th><th>차량</th><th>미팅포인트</th><th>담당</th><th>상태</th></tr></thead>
+                <thead><tr><th>일시</th><th>구분</th><th>{labels.speaker}</th><th>구간</th><th>차량</th><th>미팅포인트</th><th>담당</th><th>상태</th></tr></thead>
                 <tbody>
                   {transfers.map(({ s, t }) => (
                     <tr key={t.id} className="clickable" onClick={() => go('speakers', s.id)}>
@@ -161,7 +162,7 @@ export function Travel() {
           <Card title="의전 요구사항 요약" sub="식이·접근성·통역·동반자">
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th>연사</th><th>등급</th><th>식이</th><th>접근성</th><th>통역</th><th>동반자</th></tr></thead>
+                <thead><tr><th>{labels.speaker}</th><th>등급</th><th>식이</th><th>접근성</th><th>통역</th><th>동반자</th></tr></thead>
                 <tbody>
                   {list.filter(s => s.dietary || s.accessibility || s.interpretationNeeded || s.companions.length).map(s => (
                     <tr key={s.id}>

@@ -3,12 +3,13 @@ import { useApp } from '../store'
 import { activeConference, commsOf, speakersOf } from '../lib/metrics'
 import { Badge, Card, Drawer, StatTile, StatusBadge } from '../components/ui'
 import { fmtDate, fmtDateTime, flag, today } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import type { MailTemplate } from '../types'
 
 export function Comms() {
   const { state, dispatch } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const comms = commsOf(state)
   const list = speakersOf(state)
@@ -39,7 +40,7 @@ export function Comms() {
           <h1 className="page-title">커뮤니케이션</h1>
           <p className="page-desc">
             초청·비자·항공·제출물·정산 단계별 메일 템플릿과 발송 이력을 관리합니다. 회신 기한이 지난 건은
-            팔로업 대상으로 자동 분류되며, 발송 내역은 연사 상세에도 함께 표시됩니다.
+            팔로업 대상으로 자동 분류되며, 발송 내역은 {labels.speaker} 상세에도 함께 표시됩니다.
           </p>
         </div>
       </div>
@@ -56,7 +57,7 @@ export function Comms() {
         <Card title="팔로업 대상" sub="회신 기한이 지난 발송 건">
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>연사</th><th>제목</th><th>발송일</th><th>팔로업 기한</th><th>상태</th><th className="no-print">조치</th></tr></thead>
+              <thead><tr><th>{labels.speaker}</th><th>제목</th><th>발송일</th><th>팔로업 기한</th><th>상태</th><th className="no-print">조치</th></tr></thead>
               <tbody>
                 {followUps.map(c => {
                   const sp = state.speakers.find(s => s.id === c.speakerId)
@@ -106,7 +107,7 @@ export function Comms() {
       <Card title="발송 이력" sub="최근 순">
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>일시</th><th>구분</th><th>연사</th><th>채널</th><th>제목</th><th>담당</th><th>상태</th></tr></thead>
+            <thead><tr><th>일시</th><th>구분</th><th>{labels.speaker}</th><th>채널</th><th>제목</th><th>담당</th><th>상태</th></tr></thead>
             <tbody>
               {comms.slice(0, 80).map(c => {
                 const sp = state.speakers.find(s => s.id === c.speakerId)

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useApp } from '../store'
+import { useApp, useEnsure } from '../store'
 import { activeConference, computeRisks, readiness } from '../lib/metrics'
 import { Avatar, Badge, Card, DL, Empty, StatusBadge, TierTag } from '../components/ui'
 import { daysBetween, ddayLabel, flag, fmtDate, fmtDateTime, krw, money, today, toneOf } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { CAN_PRINT } from '../lib/env'
 import { PIPELINE_ORDER } from '../types'
@@ -15,10 +15,12 @@ const TABS = ['개요', '초청·계약', '출입국·비자', '여행·의전',
 
 export function SpeakerDetail({ id }: { id: string }) {
   const { state, dispatch } = useApp()
+  const labels = labelsOf(activeConference(state))
+  useEnsure(['communications', 'auditLogs'])
   const [tab, setTab] = useState('개요')
   const sp = state.speakers.find(s => s.id === id)
   const conf = activeConference(state)
-  if (!sp) return <Empty>연사를 찾을 수 없습니다.</Empty>
+  if (!sp) return <Empty>{labels.speaker}를 찾을 수 없습니다.</Empty>
 
   const liaison = state.members.find(m => m.id === sp.liaisonMemberId)
   const pkg = state.supportPackages.find(p => p.id === sp.supportPackageId)!
@@ -226,7 +228,7 @@ export function SpeakerDetail({ id }: { id: string }) {
                   ['요금', `${krw(sp.hotel.ratePerNight)} / 박`],
                   ['요청사항', sp.hotel.requests],
                 ]} />
-              ) : <Empty>숙박 미배정 (온라인 연사 또는 미확정)</Empty>}
+              ) : <Empty>숙박 미배정 (온라인 {labels.speaker} 또는 미확정)</Empty>}
             </Card>
             <Card title="의전·차량">
               {sp.transfers.length ? sp.transfers.map(t => (

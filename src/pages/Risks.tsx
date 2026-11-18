@@ -1,3 +1,4 @@
+import { labelsOf } from '../lib/scope'
 import { useApp } from '../store'
 import { activeConference, computeRisks, validateAll } from '../lib/metrics'
 import { Badge, Card, StatTile } from '../components/ui'
@@ -10,6 +11,7 @@ const TONE = { critical: 'critical', serious: 'serious', warning: 'warning' } as
 
 export function Risks() {
   const { state } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const risks = computeRisks(state)
   const quality = validateAll(state)
@@ -18,7 +20,7 @@ export function Risks() {
   const byCat = risks.reduce<Record<string, number>>((a, r) => { a[r.category] = (a[r.category] ?? 0) + 1; return a }, {})
 
   const exportCsv = () => downloadCsv(`${conf.code}_리스크리포트.csv`,
-    [['위험도', '분류', '연사', '내용', '상세', '조치기한'],
+    [['위험도', '분류', labels.speaker, '내용', '상세', '조치기한'],
     ...risks.map(r => [LEVEL_LABEL[r.level], r.category, r.speakerName, r.title, r.detail, r.dueDate])])
 
   return (
@@ -51,10 +53,10 @@ export function Risks() {
         </div>
       </Card>
 
-      <Card title="리스크 목록" sub="위험도 순 정렬 · 행 클릭 시 해당 연사 상세로 이동">
+      <Card title="리스크 목록" sub={`위험도 순 정렬 · 행 클릭 시 해당 ${labels.speaker} 상세로 이동`}>
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>위험도</th><th>분류</th><th>연사</th><th>내용</th><th>상세</th><th>조치 기한</th></tr></thead>
+            <thead><tr><th>위험도</th><th>분류</th><th>{labels.speaker}</th><th>내용</th><th>상세</th><th>조치 기한</th></tr></thead>
             <tbody>
               {risks.map(r => {
                 const sp = state.speakers.find(s => s.id === r.speakerId)

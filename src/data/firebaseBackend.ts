@@ -12,7 +12,8 @@ import {
   signOut as fbSignOut, type Auth, type User,
 } from 'firebase/auth'
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, serverTimestamp,
+  collection, deleteDoc, doc, getDoc, getDocs, initializeFirestore, onSnapshot,
+  persistentLocalCache, persistentMultipleTabManager, serverTimestamp,
   setDoc, writeBatch, type Firestore,
 } from 'firebase/firestore'
 import type { AppState, Member } from '../types'
@@ -30,6 +31,14 @@ function emptyState(): AppState {
 
 const ORDERED_DESC: CollectionKey[] = ['auditLogs', 'comments', 'communications']
 
+/**
+ * 접속하자마자 받지 않고, 해당 화면을 열 때 처음 받는 컬렉션.
+ * 대시보드가 쓰지 않는 데이터만 넣는다(화면에 빈칸이 보이면 안 되므로).
+ *   communications → 연자 상세, auditLogs → 변경 이력, comments·attachments → 문서·회의록
+ */
+const DEFERRED: CollectionKey[] = ['communications', 'auditLogs', 'comments', 'attachments']
+const EAGER: CollectionKey[] = COLLECTIONS.filter(c => !DEFERRED.includes(c))
+
 export class FirebaseBackend implements Backend {
   readonly mode = '공유' as const
   private app: FirebaseApp
@@ -40,6 +49,8 @@ export class FirebaseBackend implements Backend {
   private onState?: (s: AppState) => void
   private onStatus?: (st: BackendStatus) => void
   private unsubs: (() => void)[] = []
+  private subscribed = new Set<CollectionKey>()
+  private wanted = new Set<CollectionKey>()
   private loaded = new Set<CollectionKey>()
   private user?: SessionUser
   private pending = 0
@@ -47,7 +58,11 @@ export class FirebaseBackend implements Backend {
   constructor(config: RuntimeConfig) {
     this.config = config
     this.app = initializeApp(config.firebase as FirebaseConfig)
-    this.db = getFirestore(this.app)
+    // 로컬 캐시(IndexedDB)를 켠다. 두 번째 접속부터는 바뀐 문서만 받아오므로
+    // 읽기 횟수가 급격히 줄고(= 요금), 새로고침도 즉시 그려진다.
+    this.db = initializeFirestore(this.app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
     this.auth = getAuth(this.app)
   }
 
@@ -113,11 +128,29 @@ export class FirebaseBackend implements Backend {
     return member
   }
 
-  /** 모든 컬렉션 구독 */
+  /** 화면에 필요한 컬렉션만 구독한다 */
   private attach() {
     this.state = emptyState()
     this.loaded.clear()
-    COLLECTIONS.forEach(col => {
+    this.subscribed.clear()
+    this.subscribe([...EAGER, ...this.wanted])
+  }
+
+  /**
+   * 아직 받지 않은 컬렉션을 지금 받는다(해당 화면을 처음 열 때 호출된다).
+   * 로그인 전이면 요청만 기록해 두고, 로그인 직후 함께 구독한다.
+   */
+  ensure(cols: CollectionKey[]) {
+    const next = cols.filter(c => !this.wanted.has(c))
+    next.forEach(c => this.wanted.add(c))
+    if (!this.user?.memberId) return
+    this.subscribe(next.filter(c => !this.subscribed.has(c)))
+  }
+
+  private subscribe(cols: CollectionKey[]) {
+    cols.forEach(col => {
+      if (this.subscribed.has(col)) return
+      this.subscribed.add(col)
       const unsub = onSnapshot(collection(this.db, col),
         snap => {
           const list: Record<string, unknown>[] = snap.docs.map(d => ({ ...(d.data() as Record<string, unknown>), id: d.id }))
@@ -131,7 +164,7 @@ export class FirebaseBackend implements Backend {
           this.state = { ...this.state }
           // 첫 로딩이 끝나기 전에도 화면을 그린다(빈 목록 → 점진적으로 채워짐)
           this.onState?.(this.withSession(this.state))
-          this.emitStatus({ connected: this.loaded.size === COLLECTIONS.length, needsSignIn: false })
+          this.emitStatus({ connected: this.loaded.size >= EAGER.length, needsSignIn: false })
         },
         err => this.emitStatus({ connected: false, needsSignIn: false, error: `데이터 구독 실패: ${err.message}` }),
       )
@@ -149,6 +182,7 @@ export class FirebaseBackend implements Backend {
   private detach() {
     this.unsubs.forEach(u => { try { u() } catch { /* noop */ } })
     this.unsubs = []
+    this.subscribed.clear()
   }
 
   async write(muts: Mutation[]) {

@@ -1,13 +1,16 @@
+import { labelsOf } from '../lib/scope'
 import { useMemo, useState } from 'react'
-import { useApp } from '../store'
+import { useApp, useEnsure } from '../store'
 import { Badge, Card, StatTile } from '../components/ui'
-import { auditOf } from '../lib/metrics'
+import { auditOf, activeConference } from '../lib/metrics'
 import { fmtDateTime } from '../lib/format'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 
 export function Audit() {
   const { state } = useApp()
+  const labels = labelsOf(activeConference(state))
+  useEnsure(['auditLogs'])
   const [type, setType] = useState('전체')
   const [actor, setActor] = useState('전체')
   const [q, setQ] = useState('')
@@ -23,6 +26,8 @@ export function Audit() {
 
   const actors = [...new Set(state.auditLogs.map(l => l.actor))]
   const types = [...new Set(state.auditLogs.map(l => l.entityType))]
+  /** 저장값은 '연사'로 고정이지만 화면 표기는 행사 성격을 따른다 */
+  const typeLabel = (t: string) => (t === '연사' ? labels.speaker : t)
 
   const exportCsv = () => downloadCsv('변경이력.csv', [
     ['일시', '작업자', '동작', '대상 유형', '대상', '항목', '변경 전', '변경 후', '메모'],
@@ -35,7 +40,7 @@ export function Audit() {
         <div>
           <h1 className="page-title">변경 이력</h1>
           <p className="page-desc">
-            연사·비자·여행·제출물·정산 데이터의 모든 변경이 작업자·시각과 함께 기록됩니다.
+            {labels.speaker}·비자·여행·제출물·정산 데이터의 모든 변경이 작업자·시각과 함께 기록됩니다.
             운영사·여행사 등 다수 이해관계자가 동시에 작업할 때 “누가 언제 무엇을 바꿨는지”를 추적하기 위한 감사 로그입니다.
           </p>
         </div>
@@ -53,7 +58,7 @@ export function Audit() {
         <div className="row-wrap no-print" style={{ marginBottom: 12 }}>
           <input className="input search" placeholder="대상·항목·값 검색" value={q} onChange={e => setQ(e.target.value)} />
           <select className="select" value={type} onChange={e => setType(e.target.value)}>
-            <option>전체</option>{types.map(t => <option key={t}>{t}</option>)}
+            <option>전체</option>{types.map(t => <option key={t} value={t}>{typeLabel(t)}</option>)}
           </select>
           <select className="select" value={actor} onChange={e => setActor(e.target.value)}>
             <option>전체</option>{actors.map(a => <option key={a}>{a}</option>)}
@@ -74,7 +79,7 @@ export function Audit() {
                   <td className="num small nowrap">{fmtDateTime(l.at)}</td>
                   <td className="small nowrap">{l.actor}</td>
                   <td><Badge tone={l.action === '단계변경' ? 'info' : l.action === '승인' ? 'good' : 'neutral'}>{l.action}</Badge></td>
-                  <td className="small"><span className="chip">{l.entityType}</span> {l.entityLabel}</td>
+                  <td className="small"><span className="chip">{typeLabel(l.entityType)}</span> {l.entityLabel}</td>
                   <td className="small">{l.field ?? '-'}</td>
                   <td className="small muted">{l.before ?? '-'}</td>
                   <td className="small"><strong>{l.after ?? '-'}</strong></td>

@@ -3,7 +3,7 @@ import { useApp } from '../store'
 import { activeConference, sessionsOf, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatTile } from '../components/ui'
 import { flag, fmtDate, fmtDateTime } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { CAN_PRINT } from '../lib/env'
 import type { Speaker } from '../types'
@@ -19,6 +19,7 @@ const STEPS: { key: Step; label: string }[] = [
 
 export function Onsite() {
   const { state, dispatch } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const sessions = sessionsOf(state)
   const list = speakersOf(state).filter(s => ['수락', '계약완료'].includes(s.stage))
@@ -43,7 +44,7 @@ export function Onsite() {
         <div>
           <h1 className="page-title">현장 운영</h1>
           <p className="page-desc">
-            일자별 런시트와 연사 현장 상태(공항 도착 → 호텔 → 현장 체크인 → 발표 → 출국)를 실시간으로 공유합니다.
+            일자별 런시트와 {labels.speaker} 현장 상태(공항 도착 → 호텔 → 현장 체크인 → 발표 → 출국)를 실시간으로 공유합니다.
             배지·기념품 전달, 테크 리허설, 비상 연락망을 함께 관리합니다.
           </p>
         </div>
@@ -57,11 +58,11 @@ export function Onsite() {
         ))}
       </div>
 
-      <Card title="연사 현장 상태 보드" sub="칩을 클릭하면 해당 시각이 기록됩니다(변경 이력 자동 저장)">
+      <Card title={`${labels.speaker} 현장 상태 보드`} sub="칩을 클릭하면 해당 시각이 기록됩니다(변경 이력 자동 저장)">
         <div className="table-wrap">
           <table className="data">
             <thead>
-              <tr><th>연사</th><th>등급</th><th>세션</th><th>숙소</th>{STEPS.map(s => <th key={s.key}>{s.label}</th>)}<th>배지</th></tr>
+              <tr><th>{labels.speaker}</th><th>등급</th><th>세션</th><th>숙소</th>{STEPS.map(s => <th key={s.key}>{s.label}</th>)}<th>배지</th></tr>
             </thead>
             <tbody>
               {onsiteList.map(s => (
@@ -100,7 +101,7 @@ export function Onsite() {
           </div>}>
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>시간</th><th>세션</th><th>유형</th><th>장소</th><th>진행</th><th>연사</th><th>통역/녹화</th></tr></thead>
+            <thead><tr><th>시간</th><th>세션</th><th>유형</th><th>장소</th><th>진행</th><th>{labels.speaker}</th><th>통역/녹화</th></tr></thead>
             <tbody>
               {sessions.filter(s => s.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime)).map(s => (
                 <tr key={s.id}>
@@ -134,7 +135,7 @@ export function Onsite() {
         <Card title="비상 연락망" sub="24시간 대응">
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>역할</th><th>이름</th><th>소속</th><th>연락처</th><th>담당 연사</th></tr></thead>
+              <thead><tr><th>역할</th><th>이름</th><th>소속</th><th>연락처</th><th>담당 {labels.speaker}</th></tr></thead>
               <tbody>
                 {state.members.filter(m => ['리에종', 'PCO', '사무국'].includes(m.role)).map(m => (
                   <tr key={m.id}>
@@ -148,7 +149,7 @@ export function Onsite() {
             </table>
           </div>
         </Card>
-        <Card title="온라인 연사 운영" sub="시차·리허설·백업 녹화">
+        <Card title={`온라인 ${labels.speaker} 운영`} sub="시차·리허설·백업 녹화">
           {list.filter(s => s.attendanceMode === '온라인').map(s => (
             <div key={s.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
               <div className="row" style={{ gap: 8 }}>

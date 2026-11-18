@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useApp } from '../store'
 import { activeConference, sessionsOf, speakersOf, tasksOf } from '../lib/metrics'
 import { Badge, Card, Empty } from '../components/ui'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { fmtDate, today } from '../lib/format'
 import { go } from '../lib/router'
 
@@ -15,6 +15,7 @@ const COLORS: Record<EventKind, string> = {
 
 export function Calendar() {
   const { state } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const [cursor, setCursor] = useState(() => conf.startDate.slice(0, 7))
   const [filters, setFilters] = useState<EventKind[]>(['세션', '업무', '마일스톤', '여정'])
@@ -57,7 +58,7 @@ export function Calendar() {
         <div>
           <h1 className="page-title">캘린더</h1>
           <p className="page-desc">
-            세션·업무 기한·마일스톤·연자 이동을 한 달력에 모아 봅니다. 날짜 칸의 항목을 누르면 해당 레코드로 이동합니다.
+            세션·업무 기한·마일스톤·{labels.speaker} 이동을 한 달력에 모아 봅니다. 날짜 칸의 항목을 누르면 해당 레코드로 이동합니다.
           </p>
         </div>
         <div className="row-wrap no-print">

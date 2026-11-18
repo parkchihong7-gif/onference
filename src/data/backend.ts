@@ -7,7 +7,7 @@
  * 두 모드 모두 같은 Mutation 목록을 받아 처리하므로 화면 코드는 동일하다.
  */
 import type { AppState } from '../types'
-import type { Mutation } from './mutations'
+import type { CollectionKey, Mutation } from './mutations'
 import { applyMutations } from './mutations'
 import { initialState } from './seed'
 
@@ -52,6 +52,8 @@ export interface Backend {
   signIn?(): Promise<void>
   signOut?(): Promise<void>
   reset?(next?: AppState): Promise<void>
+  /** 해당 화면에서만 쓰는 컬렉션을 뒤늦게 받아오게 한다(로컬 모드에서는 할 일이 없다) */
+  ensure?(cols: CollectionKey[]): void
   /** 공유 모드 전용 — 구성원 초대·회수 */
   listInvites?(): Promise<Invite[]>
   invite?(invite: Invite): Promise<void>

@@ -4,7 +4,7 @@ import { activeConference, buildItinerary, readiness, speakersOf, validateSpeake
 import type { DataIssue, ItineraryEvent } from '../lib/metrics'
 import { Badge, Card, DL, Empty, StatusBadge, TierTag } from '../components/ui'
 import { ddayLabel, flag, fmtDate, fmtDateTime, krw, money, toneOf } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { CAN_PRINT } from '../lib/env'
 import type { AttendanceStatus, Companion, Flight, Speaker } from '../types'
@@ -182,6 +182,7 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
 }) {
   const { state } = useApp()
   const conf = activeConference(state)
+  const labels = labelsOf(conf)
   const issues = validateSpeaker(sp, conf)
   const r = readiness(sp)
   const inbound = sp.flights.find(f => f.direction === '입국')
@@ -407,7 +408,7 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
 
       {tab === 'Itinerary Information' && (
         <Card title="개인 일정 (Itinerary)"
-          sub="항공·숙박·배차·프로그램을 합성한 일자별 일정 — 연사에게 발송하는 개인 일정표와 동일한 내용입니다"
+          sub={`항공·숙박·배차·프로그램을 합성한 일자별 일정 — ${labels.speaker}에게 발송하는 개인 일정표와 동일한 내용입니다`}
           right={CAN_PRINT ? <button className="btn btn-sm no-print" onClick={() => window.print()}>🖨 인쇄</button> : undefined}>
           {itinerary.length ? itinerary.map(day => (
             <div key={day.date} style={{ marginBottom: 18 }}>

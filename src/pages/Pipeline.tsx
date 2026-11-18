@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useApp } from '../store'
-import { speakersOf } from '../lib/metrics'
+import { speakersOf, activeConference } from '../lib/metrics'
 import { Badge, Card, TierTag } from '../components/ui'
 import { ddayLabel, flag, fmtDate, krwShort, today } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 import { NewSpeakerDialog } from '../components/Create'
@@ -13,6 +13,7 @@ const COLUMNS: PipelineStage[] = [...PIPELINE_ORDER, '거절']
 
 export function Pipeline() {
   const { state, dispatch } = useApp()
+  const labels = labelsOf(activeConference(state))
   const list = speakersOf(state)
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
@@ -34,7 +35,7 @@ export function Pipeline() {
           </p>
         </div>
         <div className="row-wrap no-print">
-          <button className="btn btn-primary" onClick={() => setAdding(true)}>＋ 연자 추가</button>
+          <button className="btn btn-primary" onClick={() => setAdding(true)}>＋ {labels.speaker} 추가</button>
         </div>
       </div>
 

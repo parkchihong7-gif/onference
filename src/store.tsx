@@ -8,6 +8,7 @@ import { initialState } from './data/seed'
 import { LocalBackend } from './data/backend'
 import type { Backend, BackendStatus, Invite } from './data/backend'
 import { applyMutations, isLocalOnly, mutationsFor } from './data/mutations'
+import type { CollectionKey } from './data/mutations'
 import { hasSharedBackend, loadConfig } from './config'
 
 export type Action =
@@ -49,6 +50,7 @@ interface Ctx {
   signIn: () => Promise<void>
   signOut: () => Promise<void>
   reset: (next?: AppState) => Promise<void>
+  ensure: (cols: CollectionKey[]) => void
   /** 공유 모드 전용 — 구성원 초대 관리 */
   invites: {
     supported: boolean
@@ -153,6 +155,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const ensure = useCallback((cols: CollectionKey[]) => { backendRef.current?.ensure?.(cols) }, [])
+
   const signIn = useCallback(async () => { await backendRef.current?.signIn?.() }, [])
   const signOut = useCallback(async () => { await backendRef.current?.signOut?.() }, [])
   const reset = useCallback(async (next?: AppState) => {
@@ -169,9 +173,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     revoke: async (email: string) => { await backendRef.current?.revokeInvite?.(email) },
   }), [status.mode])
 
-  const value = useMemo<Ctx>(() => ({ state, dispatch, status, signIn, signOut, reset, invites }),
-    [state, dispatch, status, signIn, signOut, reset, invites])
+  const value = useMemo<Ctx>(() => ({ state, dispatch, status, signIn, signOut, reset, ensure, invites }),
+    [state, dispatch, status, signIn, signOut, reset, ensure, invites])
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>
+}
+
+/**
+ * 이 화면에서만 필요한 컬렉션을 처음 열릴 때 받아온다.
+ * 공유 모드에서 접속 시 읽기 횟수를 줄이기 위한 것으로, 로컬 모드에서는 아무 일도 하지 않는다.
+ */
+export function useEnsure(cols: CollectionKey[]) {
+  const { ensure } = useApp()
+  const key = cols.filter(Boolean).join(',')
+  useEffect(() => {
+    if (!key) return
+    ensure(key.split(',') as CollectionKey[])
+  }, [ensure, key])
 }
 
 export function useApp(): Ctx {

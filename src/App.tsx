@@ -43,8 +43,8 @@ const NAV: NavDef[] = [
   { key: 'risks', label: '리스크·정합성', icon: '⚠', group: '현황', count: c => c.risks || undefined },
   { key: 'calendar', label: '캘린더', icon: '▦', group: '현황', module: '캘린더' },
   { key: 'pipeline', label: '섭외 파이프라인', icon: '⇉', group: '초청 관리' },
-  { key: 'workspace', label: '연자 워크스페이스', icon: '▤', group: '초청 관리', count: c => c.issues || undefined },
-  { key: 'speakers', label: '연자 목록', icon: '☰', group: '초청 관리', count: c => c.speakers },
+  { key: 'workspace', label: '{연자} 워크스페이스', icon: '▤', group: '초청 관리', count: c => c.issues || undefined },
+  { key: 'speakers', label: '{연자} 목록', icon: '☰', group: '초청 관리', count: c => c.speakers },
   { key: 'sessions', label: '세션·프로그램', icon: '▥', group: '초청 관리', module: '세션·프로그램' },
   { key: 'visa', label: '출입국·사증', icon: '🛂', group: '실무 진행', module: '출입국·사증', overseasOnly: true, hold: true, count: c => c.visa || undefined },
   { key: 'travel', label: '교통·숙박·의전', icon: '✈', group: '실무 진행', module: '교통·숙박' },
@@ -126,7 +126,7 @@ export function App() {
               return (
                 <button key={n.key} className="nav-item" aria-current={route.page === n.key} onClick={() => go(n.key)}>
                   <span className="nav-icon" aria-hidden>{n.icon}</span>
-                  <span>{n.label}</span>
+                  <span>{n.label.replace('{연자}', labels.speaker)}</span>
                   {n.hold && <span className="chip xsmall" style={{ padding: '0 5px' }}>검증 전</span>}
                   {c !== undefined && <span className="nav-count">{c}</span>}
                 </button>

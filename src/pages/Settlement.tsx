@@ -2,12 +2,13 @@ import { useApp } from '../store'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, HBars, StatTile, StackBar } from '../components/ui'
 import { flag, krw, krwShort, pct } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 
 export function Settlement() {
   const { state } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const list = speakersOf(state).filter(s => ['수락', '계약완료'].includes(s.stage))
 
@@ -23,8 +24,8 @@ export function Settlement() {
   const treatyApplied = list.filter(s => s.settlement.taxTreatyApplied)
   const corMissing = treatyApplied.filter(s => !s.settlement.corReceived)
 
-  const exportCsv = () => downloadCsv(`${conf.code}_연사정산내역.csv`, [
-    ['연사', '국가', '등급', '강연료(원)', '원천징수율(%)', '원천세액(원)', '실지급액(원)', '조세조약', '거주자증명서', '실비합계(원)', '총액(원)', '송금은행', 'SWIFT'],
+  const exportCsv = () => downloadCsv(`${conf.code}_${labels.speaker}정산내역.csv`, [
+    [labels.speaker, '국가', '등급', '강연료(원)', '원천징수율(%)', '원천세액(원)', '실지급액(원)', '조세조약', '거주자증명서', '실비합계(원)', '총액(원)', '송금은행', 'SWIFT'],
     ...list.map(s => {
       const exp = s.settlement.expenses.reduce((a, e) => a + e.amountKRW, 0)
       const tax = Math.round(s.settlement.honorarium * s.settlement.withholdingRate / 100)
@@ -40,7 +41,7 @@ export function Settlement() {
         <div>
           <h1 className="page-title">정산·예산</h1>
           <p className="page-desc">
-            사례비(원천징수 반영)와 교통·숙박 실비, 지급 정보를 연자 단위로 집계합니다.
+            {labels.honorarium}(원천징수 반영)와 교통·숙박 실비, 지급 정보를 {labels.speaker} 단위로 집계합니다.
             국내 거주자는 소득 구분에 따라 사업소득 3.3% 또는 기타소득 8.8%를, 비거주자는 기본 22%를 원천징수하며
             조세조약 제한세율은 거주자증명서 수령 시 적용합니다.
           </p>
@@ -88,11 +89,11 @@ export function Settlement() {
         </div>
       )}
 
-      <Card title="연사별 정산 내역">
+      <Card title={`${labels.speaker}별 정산 내역`}>
         <div className="table-wrap">
           <table className="data">
             <thead>
-              <tr><th>연자</th><th>등급</th><th>소득 구분</th><th className="right">사례비</th><th className="right">원천징수율</th><th className="right">원천세</th><th className="right">실지급</th>
+              <tr><th>{labels.speaker}</th><th>등급</th><th>소득 구분</th><th className="right">사례비</th><th className="right">원천징수율</th><th className="right">원천세</th><th className="right">실지급</th>
                 <th>조세조약</th><th>증명서</th><th className="right">실비</th><th className="right">총액</th><th>송금 정보</th></tr>
             </thead>
             <tbody>
@@ -137,7 +138,7 @@ export function Settlement() {
           <li>국내 거주자 강연료는 반복성·사업성 여부에 따라 사업소득(3.3%) 또는 기타소득(8.8%)으로 구분해 원천징수합니다.</li>
           <li>비거주자에게 지급하는 강연료는 국내원천소득으로 원천징수 대상이며, 소득 구분에 따라 세율이 달라집니다.</li>
           <li>조세조약 제한세율·면제를 적용하려면 지급 전까지 거주자증명서와 제한세율 적용 신청서를 수령해야 합니다.</li>
-          <li>항공·숙박을 주최가 직접 결제한 경우와 연사가 선지급 후 정산하는 경우의 증빙 요건이 다릅니다(영수증 원본·카드 전표).</li>
+          <li>항공·숙박을 주최가 직접 결제한 경우와 {labels.speaker}가 선지급 후 정산하는 경우의 증빙 요건이 다릅니다(영수증 원본·카드 전표).</li>
           <li>해외 송금 시 수취인 영문명과 여권 영문명이 일치해야 하며, 불일치 시 반송됩니다.</li>
           <li>지급명세서·원천징수이행상황신고는 지급일이 속한 달의 다음 달 10일까지 제출합니다.</li>
         </ul>

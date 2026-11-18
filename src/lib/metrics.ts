@@ -1,3 +1,4 @@
+import { labelsOf } from './scope'
 import type { AppState, Conference, PipelineStage, Speaker, Task } from '../types'
 import { PIPELINE_ORDER } from '../types'
 import { dday, daysBetween, pct, today } from './format'
@@ -265,6 +266,7 @@ export interface DataIssue {
 }
 
 export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
+  const L = labelsOf(conf).speaker
   const out: DataIssue[] = []
   const push = (level: IssueLevel, field: string, message: string, action: string) =>
     out.push({ id: `${sp.id}-${out.length}`, level, field, message, action })
@@ -289,7 +291,7 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
   if (overseas && bene && sp.passport && bene.replace(/\s/g, '') !== sp.passport.nameEn.replace(/\s/g, '')) {
     push('오류', '송금 수취인명',
       `송금 수취인 "${bene}" 이 여권 영문명과 다릅니다. 해외 송금이 반송될 수 있습니다.`,
-      '연사에게 은행 계좌 영문명 재확인')
+      `${L}에게 은행 계좌 영문명 재확인`)
   }
 
   /* 3. 여권 없이 발권 (해외 연자 전용) */
@@ -346,7 +348,7 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
   if (sp.hotel && isSponsored(sp) && sp.hotel.nights > sp.supportedNights) {
     push('확인', '숙박 지원 한도',
       `실제 ${sp.hotel.nights}박이나 지원 한도는 ${sp.supportedNights}박입니다. 초과 ${sp.hotel.nights - sp.supportedNights}박의 부담 주체를 확정해야 합니다.`,
-      '초과분 승인(예산 반영) 또는 연사 자비 부담 안내')
+      `초과분 승인(예산 반영) 또는 ${L} 자비 부담 안내`)
   }
 
   /* 6. 동반자 객실·서류 */
@@ -376,7 +378,7 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
   }
   if (overseas && isSponsored(sp) && isConfirmed(sp) && !online && !sp.flights.length) {
     push('경고', '항공',
-      '해외 연자이나 항공 예약이 없습니다.',
+      `해외 ${L}이나 항공 예약이 없습니다.`,
       '여행사에 스케줄 요청(요금 보장 마감 확인)')
   }
 
@@ -402,7 +404,7 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
   /* 10. 온라인 연사에 오프라인 데이터 */
   if (online && (sp.flights.length || sp.hotel)) {
     push('경고', '참가 형태',
-      '온라인 발표 연사에게 항공·숙박 데이터가 입력되어 있습니다.',
+      `온라인 발표 ${L}에게 항공·숙박 데이터가 입력되어 있습니다.`,
       '참가 형태 또는 예약 데이터 정정')
   }
 

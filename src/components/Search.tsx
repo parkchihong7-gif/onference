@@ -1,7 +1,8 @@
+import { activeConference } from '../lib/metrics'
 import { useEffect, useMemo, useState } from 'react'
-import { useApp } from '../store'
+import { useApp, useEnsure } from '../store'
 import { go } from '../lib/router'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { fmtDate } from '../lib/format'
 
 interface Hit { kind: string; title: string; sub: string; page: string; id?: string }
@@ -9,6 +10,9 @@ interface Hit { kind: string; title: string; sub: string; page: string; id?: str
 /** 전역 검색 — 연자·문서·세션·업무·초록·등록·후원·코멘트를 한 번에 찾는다 (Ctrl/⌘+K) */
 export function Search({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state } = useApp()
+  const labels = labelsOf(activeConference(state))
+  // 검색창은 항상 떠 있으므로, 실제로 열었을 때만 코멘트를 받아온다
+  useEnsure(open ? ['comments'] : [])
   const [q, setQ] = useState('')
   const conf = state.activeConferenceId
 
@@ -25,7 +29,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
     const has = (...parts: (string | undefined)[]) => parts.filter(Boolean).join(' ').toLowerCase().includes(t)
     const out: Hit[] = []
     state.speakers.filter(s => s.conferenceId === conf && has(s.nameKo, s.nameEn, s.affiliation, s.department, s.title, s.tags.join(' ')))
-      .slice(0, 8).forEach(s => out.push({ kind: '연자', title: displayName(s), sub: `${s.affiliation} · ${s.tier} · ${s.stage}`, page: 'speakers', id: s.id }))
+      .slice(0, 8).forEach(s => out.push({ kind: labels.speaker, title: displayName(s), sub: `${s.affiliation} · ${s.tier} · ${s.stage}`, page: 'speakers', id: s.id }))
     state.docs.filter(d => d.conferenceId === conf && has(d.title, d.body, d.tags.join(' ')))
       .slice(0, 6).forEach(d => out.push({ kind: '문서', title: d.title, sub: `${d.type} · ${fmtDate(d.updatedAt)}`, page: 'docs' }))
     state.sessions.filter(s => s.conferenceId === conf && has(s.title, s.track, s.room))
@@ -52,7 +56,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
         width: 'min(680px, 92vw)', background: 'var(--surface)', border: '1px solid var(--line-strong)',
         borderRadius: 12, boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
       }}>
-        <input autoFocus className="input" placeholder="연자 · 문서 · 세션 · 업무 · 초록 · 등록 · 후원 검색"
+        <input autoFocus className="input" placeholder={`${labels.speaker} · 문서 · 세션 · 업무 · 초록 · 등록 · 후원 검색`}
           value={q} onChange={e => setQ(e.target.value)}
           style={{ width: '100%', border: 0, borderBottom: '1px solid var(--line)', borderRadius: 0, padding: '14px 16px', fontSize: 15 }} />
         <div style={{ maxHeight: '56vh', overflowY: 'auto' }}>

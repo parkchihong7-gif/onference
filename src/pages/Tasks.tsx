@@ -3,7 +3,7 @@ import { useApp } from '../store'
 import { activeConference, tasksOf } from '../lib/metrics'
 import { Badge, Card, StatTile, StatusBadge } from '../components/ui'
 import { ddayLabel, flag, fmtDate, today } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { PHASES } from '../types'
 import type { PhaseKey, TaskStatus } from '../types'
@@ -12,6 +12,7 @@ const STATUSES: TaskStatus[] = ['대기', '진행중', '완료', '보류', '지�
 
 export function TasksPage() {
   const { state, dispatch } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const all = tasksOf(state)
   const [phase, setPhase] = useState<string>('전체')
@@ -54,14 +55,14 @@ export function TasksPage() {
         <div>
           <h1 className="page-title">업무·체크리스트</h1>
           <p className="page-desc">
-            체크리스트 템플릿으로 연사별 업무가 자동 생성되며, 행사일 기준 D-offset으로 기한이 계산됩니다.
+            체크리스트 템플릿으로 {labels.speaker}별 업무가 자동 생성되며, 행사일 기준 D-offset으로 기한이 계산됩니다.
             담당자·단계별로 필터링해 주간 운영 회의 자료로 사용할 수 있습니다.
           </p>
         </div>
       </div>
 
       <div className="grid g4">
-        <StatTile label="전체 업무" value={all.length} unit="건" foot={`연사별 ${all.filter(t => t.speakerId).length}건 · 공통 ${all.filter(t => !t.speakerId).length}건`} />
+        <StatTile label="전체 업무" value={all.length} unit="건" foot={`${labels.speaker}별 ${all.filter(t => t.speakerId).length}건 · 공통 ${all.filter(t => !t.speakerId).length}건`} />
         <StatTile label="완료" value={all.filter(t => t.status === '완료').length} unit="건" tone="good"
           bar={(all.filter(t => t.status === '완료').length / Math.max(all.length, 1)) * 100} />
         <StatTile label="진행중" value={all.filter(t => t.status === '진행중').length} unit="건" tone="info" />
@@ -89,7 +90,7 @@ export function TasksPage() {
 
       <Card title="업무 목록" right={<span className="small muted num">{rows.length}건</span>}>
         <div className="row-wrap no-print" style={{ marginBottom: 12 }}>
-          <input className="input search" placeholder="업무명·연사 검색" value={q} onChange={e => setQ(e.target.value)} />
+          <input className="input search" placeholder={`업무명·${labels.speaker} 검색`} value={q} onChange={e => setQ(e.target.value)} />
           <select className="select" value={phase} onChange={e => setPhase(e.target.value)}>
             <option>전체</option>{PHASES.map(p => <option key={p}>{p}</option>)}
           </select>
@@ -104,7 +105,7 @@ export function TasksPage() {
 
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th style={{ width: 34 }}></th><th>업무</th><th>단계</th><th>대상 연사</th><th>담당</th><th>기한</th><th>D-day</th><th>상태</th></tr></thead>
+            <thead><tr><th style={{ width: 34 }}></th><th>업무</th><th>단계</th><th>대상 {labels.speaker}</th><th>담당</th><th>기한</th><th>D-day</th><th>상태</th></tr></thead>
             <tbody>
               {rows.slice(0, 200).map(t => {
                 const sp = state.speakers.find(s => s.id === t.speakerId)

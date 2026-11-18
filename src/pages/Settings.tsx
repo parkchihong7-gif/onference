@@ -5,7 +5,7 @@ import { NewConferenceDialog } from '../components/Create'
 import { activeConference } from '../lib/metrics'
 import { Badge, Card, DL, StatTile } from '../components/ui'
 import { CORE_MODULES, DOMESTIC_MODULES, OVERSEAS_MODULES } from '../types'
-import { needsOverseasModules } from '../lib/scope'
+import { needsOverseasModules, labelsOf } from '../lib/scope'
 import type { ModuleKey } from '../types'
 import { fmtDate, krw } from '../lib/format'
 
@@ -13,6 +13,7 @@ const ROLES = ['사무국', 'PCO', '리에종', '여행사', '재무', '연사']
 
 export function Settings() {
   const { state, dispatch, status, invites } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const [inviteList, setInviteList] = useState<Invite[]>([])
   const [email, setEmail] = useState('')
@@ -56,7 +57,7 @@ export function Settings() {
           <p className="page-desc">
             행사 성격(국내/국제)과 활성 모듈, 지원 패키지, 체크리스트 템플릿, 권한 구성을 관리합니다.
             모듈을 끄면 해당 메뉴가 숨겨지고, 켜면 즉시 나타납니다. 초기 세팅에서 템플릿을 확정하면
-            신규 연자 등록 시 업무·제출물·기한이 자동 생성됩니다.
+            신규 {labels.speaker} 등록 시 업무·제출물·기한이 자동 생성됩니다.
           </p>
         </div>
         <div className="row-wrap no-print">
@@ -155,7 +156,7 @@ export function Settings() {
 
       <Card title="모듈 구성" sub="행사 성격에 따라 기본값이 적용되며, 필요에 따라 켜고 끌 수 있습니다">
         <div className="grid g3">
-          {([['공통 모듈', CORE_MODULES], ['국내 학회 모듈', DOMESTIC_MODULES], ['해외 연자 모듈 (검증 전)', OVERSEAS_MODULES]] as [string, ModuleKey[]][]).map(([group, keys]) => (
+          {([['공통 모듈', CORE_MODULES], ['국내 학회 모듈', DOMESTIC_MODULES], [`해외 ${labels.speaker} 모듈 (검증 전)`, OVERSEAS_MODULES]] as [string, ModuleKey[]][]).map(([group, keys]) => (
             <div key={group}>
               <div className="small sec" style={{ marginBottom: 8, fontWeight: 600 }}>{group}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -167,7 +168,7 @@ export function Settings() {
                       <input type="checkbox" checked={on}
                         onChange={() => dispatch({ type: 'TOGGLE_MODULE', conferenceId: conf.id, module: k })} />
                       <span style={{ flex: 1 }}>{k}</span>
-                      {isOverseas && !needsOverseasModules(state) && <span className="chip xsmall">해외 연자 없음</span>}
+                      {isOverseas && !needsOverseasModules(state) && <span className="chip xsmall">해외 {labels.speaker} 없음</span>}
                       {isOverseas && <span className="chip xsmall">검증 전</span>}
                     </label>
                   )
@@ -179,9 +180,9 @@ export function Settings() {
         <div className="alert alert-info" style={{ marginTop: 14 }}>
           <span aria-hidden>ℹ</span>
           <span>
-            출입국·사증, 해외송금·조세조약은 <strong>해외에서 오는 연자가 있을 때만</strong> 메뉴에 표시됩니다.
-            국내 학회에 해외 연자 1명이 있어도 동일하게 적용되며, 그 외 과정(섭외·계약·교통·숙박·제출물·현장·정산)은
-            국내 연자와 같은 모듈로 처리됩니다.
+            출입국·사증, 해외송금·조세조약은 <strong>해외에서 오는 {labels.speaker}가 있을 때만</strong> 메뉴에 표시됩니다.
+            국내 학회에 해외 {labels.speaker} 1명이 있어도 동일하게 적용되며, 그 외 과정(섭외·계약·교통·숙박·제출물·현장·정산)은
+            국내 {labels.speaker}와 같은 모듈로 처리됩니다.
           </span>
         </div>
       </Card>
@@ -223,11 +224,11 @@ export function Settings() {
           </div>
           <ul className="xsmall muted" style={{ paddingLeft: 16, marginTop: 10, lineHeight: 1.8 }}>
             <li><strong>사무국</strong> — 전체 데이터 및 예산·정산 접근</li>
-            <li><strong>PCO</strong> — 연사 실무(제출물·현장·배차), 정산 금액 비공개</li>
-            <li><strong>리에종</strong> — 담당 연사 전체 · 타 연사 열람 제한</li>
+            <li><strong>PCO</strong> — {labels.speaker} 실무(제출물·현장·배차), 정산 금액 비공개</li>
+            <li><strong>리에종</strong> — 담당 {labels.speaker} 전체 · 타 {labels.speaker} 열람 제한</li>
             <li><strong>여행사</strong> — 항공·숙박·배차 및 필요한 여권 정보만</li>
             <li><strong>재무</strong> — 정산·세무·송금 정보</li>
-            <li><strong>연사</strong> — 본인 제출물·일정 확인(연사 포털)</li>
+            <li><strong>연사</strong> — 본인 제출물·일정 확인(본인 포털). 역할 이름은 데이터 값이라 행사 성격과 무관하게 고정입니다.</li>
           </ul>
         </Card>
       </div>
@@ -282,7 +283,7 @@ export function Settings() {
         <ul className="small sec" style={{ paddingLeft: 18, margin: 0, lineHeight: 1.85 }}>
           <li>본 대시보드는 <strong>내부 운영용(비배포)</strong>으로, 데이터는 브라우저 로컬 스토리지에만 저장됩니다.</li>
           <li>여권번호·계좌번호 등 민감정보는 화면에서 마스킹되며, 원본 문서는 별도 문서고에서 접근 권한을 통제합니다.</li>
-          <li>유럽(EEA) 거주 연사 데이터는 GDPR 적용 대상으로, 수집 목적·보유기간 고지와 동의 기록이 필요합니다.</li>
+          <li>유럽(EEA) 거주 {labels.speaker} 데이터는 GDPR 적용 대상으로, 수집 목적·보유기간 고지와 동의 기록이 필요합니다.</li>
           <li>행사 종료 후 보유기간이 경과한 개인정보는 파기 대상으로 분류합니다.</li>
         </ul>
       </Card>

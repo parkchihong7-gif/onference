@@ -1,3 +1,4 @@
+import { labelsOf } from '../lib/scope'
 import { useMemo, useState } from 'react'
 import { useApp } from '../store'
 import { Field, Modal } from './ui'
@@ -40,6 +41,8 @@ export function NewConferenceDialog(
   const [err, setErr] = useState('')
 
   const modules = useMemo(() => defaultModules(scope, industry), [scope, industry])
+  // 지금 입력 중인 행사 성격을 따라 용어가 바뀐다(국내 학회 = 연자, 국제 컨퍼런스 = 연사)
+  const labels = labelsOf({ scope } as Parameters<typeof labelsOf>[0])
 
   const reset = () => {
     setNameKo(''); setNameEn(''); setCode(''); setVenue(''); setHost(''); setPco('')
@@ -139,7 +142,7 @@ export function NewConferenceDialog(
         <Field label="총 예산 (원)">
           <input className="input" type="number" min={0} step={1_000_000} value={budget} onChange={e => setBudget(Number(e.target.value))} />
         </Field>
-        <Field label="연자 초청 예산 (원)">
+        <Field label={`${labels.speaker} ${labels.invite} 예산 (원)`}>
           <input className="input" type="number" min={0} step={1_000_000} value={inviteBudget} onChange={e => setInviteBudget(Number(e.target.value))} />
         </Field>
 
@@ -158,7 +161,7 @@ export function NewConferenceDialog(
         {!fresh && copyFrom && (
           <label className="row small" style={{ gap: 8, gridColumn: '1 / -1' }}>
             <input type="checkbox" checked={copySessions} onChange={e => setCopySessions(e.target.checked)} />
-            세션 구성 복사 (날짜는 새 일정으로 자동 조정 · 연자 배정은 비웁니다)
+            세션 구성 복사 (날짜는 새 일정으로 자동 조정 · {labels.speaker} 배정은 비웁니다)
           </label>
         )}
       </div>
@@ -179,6 +182,7 @@ export function NewConferenceDialog(
 export function NewSpeakerDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, dispatch } = useApp()
   const conf = activeConference(state)
+  const labels = labelsOf(conf)
   const sessions = state.sessions.filter(s => s.conferenceId === conf.id)
   const packages = state.supportPackages
   const [residency, setResidency] = useState<'국내' | '해외'>(conf.scope === '국제' ? '해외' : '국내')
@@ -216,7 +220,7 @@ export function NewSpeakerDialog({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <Modal open={open} onClose={onClose} wide
-      title={`${conf.scope === '국내' ? '연자' : '연사'} 추가`}
+      title={`${labels.speaker} 추가`}
       sub="등록하면 제출물 목록과 업무 체크리스트가 함께 생성됩니다"
       footer={
         <>
@@ -226,10 +230,10 @@ export function NewSpeakerDialog({ open, onClose }: { open: boolean; onClose: ()
       }>
       {err && <div className="alert alert-critical" style={{ marginBottom: 12 }}><span aria-hidden>⛔</span><span>{err}</span></div>}
       <div className="form-grid">
-        <Field label="구분" hint="해외 연자에게만 출입국·해외송금이 적용됩니다">
+        <Field label="구분" hint={`해외 ${labels.speaker}에게만 출입국·해외송금이 적용됩니다`}>
           <select className="select" value={residency} onChange={e => setResidency(e.target.value as '국내' | '해외')}>
-            <option value="국내">국내 연자</option>
-            <option value="해외">해외 연자</option>
+            <option value="국내">국내 {labels.speaker}</option>
+            <option value="해외">해외 {labels.speaker}</option>
           </select>
         </Field>
         <Field label="등급">

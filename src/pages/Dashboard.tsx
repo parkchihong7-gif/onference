@@ -104,7 +104,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <Card title="행사 준비 시작하기" sub="① 행사 정보 → ② 세션/프로그램 → ③ 연자 등록 순으로 진행하면 체크리스트·일정·리스크가 자동 생성됩니다.">
+        <Card title="행사 준비 시작하기" sub={`① 행사 정보 → ② 세션/프로그램 → ③ ${labels.speaker} 등록 순으로 진행하면 체크리스트·일정·리스크가 자동 생성됩니다.`}>
           <div className="start-steps">
             <div className="start-step">
               <div className="start-num">1</div>
@@ -122,7 +122,7 @@ export function Dashboard() {
               <div style={{ flex: 1 }}>
                 <strong>세션 · 프로그램 구성</strong>
                 <p className="muted small">
-                  현재 {confSessions.length}개 세션. 세션을 먼저 만들면 연자 배정과 제출물 기한이 자동으로 연동됩니다.
+                  현재 {confSessions.length}개 세션. 세션을 먼저 만들면 {labels.speaker} 배정과 제출물 기한이 자동으로 연동됩니다.
                 </p>
                 <div className="row-wrap">
                   <button className="btn btn-sm btn-primary" onClick={() => setAddSession(true)}>＋ 세션 추가</button>
@@ -135,7 +135,7 @@ export function Dashboard() {
               <div style={{ flex: 1 }}>
                 <strong>{labels.speaker} 등록</strong>
                 <p className="muted small">
-                  연자를 등록하면 {conf.scope === '국제' ? '사증·항공·숙박·해외송금' : '교통·숙박·원고·동의서'} 업무와 제출물 체크리스트가 자동 생성됩니다.
+                  {labels.speaker}를 등록하면 {conf.scope === '국제' ? '사증·항공·숙박·해외송금' : '교통·숙박·원고·동의서'} 업무와 제출물 체크리스트가 자동 생성됩니다.
                 </p>
                 <div className="row-wrap">
                   <button className="btn btn-sm btn-primary" onClick={() => setAddSpeaker(true)}>＋ {labels.speaker} 추가</button>
@@ -184,14 +184,14 @@ export function Dashboard() {
           foot={`응답 완료 기준 · 거절 ${list.filter(s => s.stage === '거절').length}명`} bar={k.acceptRate} tone="info" />
         {k.visaTotal > 0 ? (
           <StatTile label="사증 발급 완료" value={`${k.visaDone}/${k.visaTotal}`}
-            foot={`해외 연자 ${overseas.length}명 · 사증 필요 ${k.visaTotal}명`}
+            foot={`해외 ${labels.speaker} ${overseas.length}명 · 사증 필요 ${k.visaTotal}명`}
             bar={pct(k.visaDone, k.visaTotal)} tone={k.visaDone < k.visaTotal ? 'warning' : 'good'} />
         ) : hasModule(conf, '참가등록') ? (
           <StatTile label="사전 등록" value={regs.filter(r => r.channel === '사전등록').length} unit="명"
             foot={`목표 ${Math.round(conf.expectedAttendees * 0.75)}명 · 수납률 ${pct(regs.filter(r => r.paid).length, regs.length)}%`}
             bar={pct(regs.length, Math.round(conf.expectedAttendees * 0.75))} tone="info" />
         ) : (
-          <StatTile label="제출물 검수" value={`${k.docDone}/${k.docTotal}`} bar={pct(k.docDone, k.docTotal)} tone="info" foot="연자 제출 서류" />
+          <StatTile label="제출물 검수" value={`${k.docDone}/${k.docTotal}`} bar={pct(k.docDone, k.docTotal)} tone="info" foot={`${labels.speaker} 제출 서류`} />
         )}
         <StatTile label="교통 확정" value={`${k.flightsTicketed}/${k.flightsNeeded}`}
           foot={overseas.length > 0 ? '국제선 요금 보장 마감 D-60 기준' : 'KTX·국내선·자가용 포함'}
@@ -231,11 +231,11 @@ export function Dashboard() {
 
       <div className="grid g3">
         {k.visaTotal > 0 ? (
-          <Card title="사증·출입국 진행" sub={`해외 연자 ${overseas.length}명 중 사증 필요 ${visaCases.length}명`}>
+          <Card title="사증·출입국 진행" sub={`해외 ${labels.speaker} ${overseas.length}명 중 사증 필요 ${visaCases.length}명`}>
             <Donut data={visaDist} centerValue={`${k.visaDone}/${k.visaTotal}`} centerLabel="발급 완료" />
           </Card>
         ) : (
-          <Card title="제출물 진행" sub="연자 제출 서류 검수 현황">
+          <Card title="제출물 진행" sub={`${labels.speaker} 제출 서류 검수 현황`}>
             <Donut centerValue={`${k.docDone}/${k.docTotal}`} centerLabel="검수 완료" data={[
               { label: '검수완료', value: k.docDone, color: 'var(--s3)' },
               { label: '제출(검수 전)', value: list.flatMap(s => s.deliverables).filter(d => d.status === '제출').length, color: 'var(--s1)' },
@@ -244,11 +244,11 @@ export function Dashboard() {
             ]} />
           </Card>
         )}
-        <Card title="국가·지역 분포" sub="초청 진행 중인 연사 기준">
+        <Card title="국가·지역 분포" sub={`초청 진행 중인 ${labels.speaker} 기준`}>
           {byCountry.length ? <HBars data={byCountry} unit="명" /> : <div className="empty">등록된 초청자가 없습니다.</div>}
         </Card>
-        <Card title="준비도 하위 연사" sub="수락·계약 완료 연사의 실무 완료율">
-          {!lowReady.length && <div className="empty">수락 완료된 연사가 없습니다.</div>}
+        <Card title={`준비도 하위 ${labels.speaker}`} sub={`수락·계약 완료 ${labels.speaker}의 실무 완료율`}>
+          {!lowReady.length && <div className="empty">수락 완료된 {labels.speaker}가 없습니다.</div>}
           {lowReady.map(({ s, r }) => (
             <div key={s.id} style={{ marginBottom: 10, cursor: 'pointer' }} onClick={() => go('speakers', s.id)}>
               <div className="row small" style={{ justifyContent: 'space-between' }}>
@@ -262,12 +262,12 @@ export function Dashboard() {
       </div>
 
       <div className="grid g23">
-        <Card title="연자 체류 일정" sub="입국 ~ 출국 기간 (빨간선 = 오늘)">
+        <Card title={`${labels.speaker} 체류 일정`} sub="입국 ~ 출국 기간 (빨간선 = 오늘)">
           {ganttRows.length ? (
             <Gantt rows={ganttRows} start={ganttStart} end={ganttEnd} todayISO={today()} />
           ) : <div className="empty">발권 확정된 여정이 없습니다.</div>}
           <div className="legend" style={{ marginTop: 10 }}>
-            <span><i style={{ background: 'var(--s7)' }} />기조연사</span>
+            <span><i style={{ background: 'var(--s7)' }} />기조{labels.speaker}</span>
             <span><i style={{ background: 'var(--s1)' }} />초청·패널</span>
           </div>
         </Card>

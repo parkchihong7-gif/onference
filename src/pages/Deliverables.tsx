@@ -3,7 +3,7 @@ import { useApp } from '../store'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatTile, StackBar } from '../components/ui'
 import { ddayLabel, flag, fmtDate, pct, today } from '../lib/format'
-import { displayName } from '../lib/scope'
+import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
 import type { DeliverableStatus } from '../types'
@@ -32,6 +32,7 @@ const CELL: Record<DeliverableStatus, { bg: string; mark: string; tone: string }
 
 export function Deliverables() {
   const { state, dispatch } = useApp()
+  const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const list = speakersOf(state).filter(s => ['수락', '계약완료'].includes(s.stage))
   const [onlyLate, setOnlyLate] = useState(false)
@@ -44,7 +45,7 @@ export function Deliverables() {
   const counts = (st: DeliverableStatus) => all.filter(x => x.d.status === st).length
 
   const exportCsv = () => downloadCsv(`${conf.code}_제출물현황.csv`, [
-    ['연사', '국가', '구분', '기한', '상태', '제출일', '파일'],
+    [labels.speaker, '국가', '구분', '기한', '상태', '제출일', '파일'],
     ...all.map(({ s, d }) => [s.nameEn, s.country, d.type, d.dueDate, d.status, d.submittedAt, d.fileName]),
   ])
 
@@ -66,13 +67,13 @@ export function Deliverables() {
         <div>
           <h1 className="page-title">제출물·콘텐츠 관리</h1>
           <p className="page-desc">
-            약력·사진·초록·발표자료와 각종 동의서(녹화·중계, 개인정보, 강연동의서)를 연사 × 항목 매트릭스로 추적합니다.
+            약력·사진·초록·발표자료와 각종 동의서(녹화·중계, 개인정보, 강연동의서)를 {labels.speaker} × 항목 매트릭스로 추적합니다.
             기한이 지난 항목은 리마인드 발송 대상으로 표시됩니다.
           </p>
         </div>
         <div className="row-wrap no-print">
           <label className="chip" style={{ cursor: 'pointer' }}>
-            <input type="checkbox" checked={onlyLate} onChange={e => setOnlyLate(e.target.checked)} /> 지연 연사만
+            <input type="checkbox" checked={onlyLate} onChange={e => setOnlyLate(e.target.checked)} /> 지연 {labels.speaker}만
           </label>
           <button className="btn" onClick={exportCsv}>⬇ 현황 내보내기</button>
         </div>
@@ -97,7 +98,7 @@ export function Deliverables() {
           <table className="data">
             <thead>
               <tr>
-                <th style={{ minWidth: 190 }}>연사</th>
+                <th style={{ minWidth: 190 }}>{labels.speaker}</th>
                 {types.map(t => (
                   <th key={t} className="xsmall" title={t}
                     style={{ writingMode: 'vertical-rl', height: 116, padding: '8px 3px', whiteSpace: 'nowrap', fontWeight: 600 }}>
@@ -144,7 +145,7 @@ export function Deliverables() {
       <Card title="기한 경과 항목" sub="리마인드 발송 시 커뮤니케이션 로그에 기록됩니다">
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>연사</th><th>제출물</th><th>기한</th><th>경과</th><th>상태</th><th className="no-print">조치</th></tr></thead>
+            <thead><tr><th>{labels.speaker}</th><th>제출물</th><th>기한</th><th>경과</th><th>상태</th><th className="no-print">조치</th></tr></thead>
             <tbody>
               {late.map(({ s, d }) => (
                 <tr key={d.id}>
