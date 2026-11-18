@@ -82,7 +82,8 @@ npm run build:html  # 단일 HTML 파일(onference-dashboard.html) 재생성
 ```bash
 git clone <저장소> && cd onference
 gcloud config set project <프로젝트ID>
-bash deploy/deploy-cloudrun.sh
+bash deploy/deploy-cloudrun.sh          # 배포 → HTTPS 주소
+bash deploy/setup-firebase.sh --admin 본인이메일@도메인   # 공동 작업(로그인·실시간 공유) 켜기
 ```
 
 ## 설계 문서
