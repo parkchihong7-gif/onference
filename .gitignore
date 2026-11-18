@@ -4,3 +4,6 @@ dist
 *.local
 dist-single
 artifact
+
+# 접근 제어 파일 — 서버에만 둔다
+deploy/.htpasswd

@@ -1,0 +1,29 @@
+# Node 정적 서버를 systemd 서비스로 상주시킨다 (Docker 를 쓰지 않는 서버용)
+#   sudo cp deploy/onference.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now onference
+#   sudo journalctl -u onference -f
+
+[Unit]
+Description=ONFERENCE 행사 관리 대시보드 (정적 서버)
+After=network.target
+
+[Service]
+Type=simple
+# 실제 배포 경로·계정으로 수정한다
+WorkingDirectory=/srv/onference
+ExecStart=/usr/bin/node deploy/server.mjs dist
+Environment=PORT=8080
+# 접근 제어가 필요하면 주석 해제 (값은 서버에서만 설정, 저장소에 넣지 않는다)
+# Environment=AUTH_USER=staff
+# Environment=AUTH_PASS=변경하세요
+User=www-data
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target
