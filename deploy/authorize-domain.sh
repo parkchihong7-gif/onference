@@ -32,8 +32,11 @@ gcloud services enable identitytoolkit.googleapis.com --project "${PROJECT_ID}" 
 
 TOKEN="$(gcloud auth print-access-token)"
 API="https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/config"
+# Cloud Shell 은 사용자 자격증명(ADC)으로 호출하므로 할당량 프로젝트를 명시해야 한다.
+# 이게 없으면 403 "requires a quota project" 로 거부된다.
+AUTH_HEADERS=(-H "Authorization: Bearer ${TOKEN}" -H "x-goog-user-project: ${PROJECT_ID}")
 
-CURRENT="$(curl -sS -H "Authorization: Bearer ${TOKEN}" "${API}")"
+CURRENT="$(curl -sS "${AUTH_HEADERS[@]}" "${API}")"
 if printf '%s' "${CURRENT}" | grep -q '"error"'; then
   echo "❌ 현재 설정을 읽지 못했습니다:" >&2
   printf '%s\n' "${CURRENT}" | head -20 >&2
@@ -59,7 +62,7 @@ process.stdin.on("end", () => {
 }
 
 RESP="$(curl -sS -X PATCH "${API}?updateMask=authorizedDomains" \
-  -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+  "${AUTH_HEADERS[@]}" -H "Content-Type: application/json" \
   -d "${BODY}")"
 
 if printf '%s' "${RESP}" | grep -q '"error"'; then
