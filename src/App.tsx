@@ -7,6 +7,7 @@ import { ddayLabel, today } from './lib/format'
 import { Search } from './components/Search'
 import { AuthGate } from './components/AuthGate'
 import { NewConferenceDialog } from './components/Create'
+import { Screen } from './components/AuthGate'
 import { Dashboard } from './pages/Dashboard'
 import { Pipeline } from './pages/Pipeline'
 import { Workspace } from './pages/Workspace'
@@ -63,6 +64,52 @@ const NAV: NavDef[] = [
 ]
 
 export function App() {
+  const { state, status } = useApp()
+  // 순서가 중요하다 — 로그인 관문을 먼저 통과시킨 뒤에 행사 유무를 따진다.
+  // 공유 모드에서는 첫 스냅샷이 오기 전까지 행사 목록이 비어 있는데, 그 상태로
+  // 행사 정보를 참조하면 화면 전체가 죽는다(백지).
+  return (
+    <AuthGate>
+      {state.conferences.length ? <AppShell /> : <NoConference connected={status.connected} />}
+    </AuthGate>
+  )
+}
+
+/** 행사가 아직 없을 때 — 로딩 중이거나, 정말로 비어 있는 경우 */
+function NoConference({ connected }: { connected: boolean }) {
+  const [newConf, setNewConf] = useState(false)
+  const [waited, setWaited] = useState(false)
+  useEffect(() => {
+    // 잠깐 기다려도 안 오면 '비어 있음'으로 안내한다
+    const t = setTimeout(() => setWaited(true), 2500)
+    return () => clearTimeout(t)
+  }, [])
+
+  if (!connected && !waited) {
+    return <Screen title="ONFERENCE" sub="데이터를 불러오는 중입니다" body={<div className="small muted">잠시만 기다려 주세요…</div>} />
+  }
+  return (
+    <>
+      <NewConferenceDialog open={newConf} onClose={() => setNewConf(false)} />
+      <Screen
+        title="아직 등록된 행사가 없습니다"
+        sub="첫 행사를 만들면 바로 시작할 수 있습니다"
+        body={
+          <>
+            <p className="small muted" style={{ marginBottom: 18, lineHeight: 1.7 }}>
+              행사를 만들면 성격(국내/국제)에 맞는 업무 모듈과 체크리스트가 자동으로 생성됩니다.
+            </p>
+            <button className="btn btn-primary" style={{ padding: '10px 18px', fontSize: 14 }} onClick={() => setNewConf(true)}>
+              ＋ 새 행사 만들기
+            </button>
+          </>
+        }
+      />
+    </>
+  )
+}
+
+function AppShell() {
   const { state, dispatch, status, signOut } = useApp()
   const route = useRoute()
   const conf = activeConference(state)
@@ -108,7 +155,6 @@ export function App() {
   const nav = (key: string) => visible.some(n => n.key === key)
 
   return (
-    <AuthGate>
     <div className="app">
       <nav className="sidebar">
         <div className="brand">
@@ -211,6 +257,5 @@ export function App() {
       <Search open={searchOpen} onClose={() => setSearchOpen(false)} />
       <NewConferenceDialog open={newConfOpen} onClose={() => setNewConfOpen(false)} />
     </div>
-    </AuthGate>
   )
 }

@@ -55,7 +55,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function Screen({ title, sub, body }: { title: string; sub?: string; body: ReactNode }) {
+export function Screen({ title, sub, body }: { title: string; sub?: string; body: ReactNode }) {
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--page)', padding: 24 }}>
       <div className="card" style={{ width: 'min(460px, 100%)', textAlign: 'center', padding: '32px 28px' }}>
