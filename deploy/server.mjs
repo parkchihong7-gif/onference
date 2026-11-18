@@ -52,15 +52,25 @@ function safeEqual(a, b) {
   return timingSafeEqual(x, y)
 }
 
+/**
+ * Basic 인증 자격증명의 문자 인코딩은 브라우저마다 다르다.
+ * RFC 7617 의 charset="UTF-8" 을 따르는 브라우저는 UTF-8 로, 과거 방식의 브라우저는
+ * ISO-8859-1(latin1) 로 보낸다. 한글 비밀번호는 이 차이 때문에 한쪽에서만 통과하므로
+ * 두 해석을 모두 확인한다.
+ */
 function authorized(req) {
   if (!AUTH_ON) return true
   const header = req.headers.authorization ?? ''
   if (!header.startsWith('Basic ')) return false
-  let decoded = ''
-  try { decoded = Buffer.from(header.slice(6), 'base64').toString('utf8') } catch { return false }
-  const i = decoded.indexOf(':')
-  if (i < 0) return false
-  return safeEqual(decoded.slice(0, i), USER) && safeEqual(decoded.slice(i + 1), PASS)
+  let raw
+  try { raw = Buffer.from(header.slice(6), 'base64') } catch { return false }
+  for (const enc of ['utf8', 'latin1']) {
+    const decoded = raw.toString(enc)
+    const i = decoded.indexOf(':')
+    if (i < 0) continue
+    if (safeEqual(decoded.slice(0, i), USER) && safeEqual(decoded.slice(i + 1), PASS)) return true
+  }
+  return false
 }
 
 /**
@@ -145,4 +155,8 @@ const server = createServer((req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`ONFERENCE → http://${HOST}:${PORT}  (root: ${ROOT}${AUTH_ON ? ', Basic 인증 켜짐' : ', 인증 없음'})`)
+  // 한글 비밀번호는 브라우저·OS 조합에 따라 입력 자체가 어긋날 수 있어 미리 알려 준다
+  if (AUTH_ON && /[^\x20-\x7E]/.test(USER + PASS)) {
+    console.warn('⚠ 아이디/비밀번호에 영문·숫자 외 문자가 있습니다. 브라우저에 따라 로그인이 실패할 수 있으니 영문+숫자 조합을 권장합니다.')
+  }
 })

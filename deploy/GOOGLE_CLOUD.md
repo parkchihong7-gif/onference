@@ -61,10 +61,33 @@ bash deploy/deploy-cloudrun.sh
 | 배포 이력 보기 | `gcloud run revisions list --service onference --region asia-northeast3` |
 | 직전 버전으로 되돌리기 | `gcloud run services update-traffic onference --region asia-northeast3 --to-revisions <리비전이름>=100` |
 | 실시간 로그 보기 | `gcloud beta run services logs tail onference --region asia-northeast3` |
+| **현재 설정·주소 확인** | `bash deploy/show-config.sh` |
+| 비밀번호 떼기 | `gcloud run services update onference --region asia-northeast3 --remove-env-vars AUTH_USER,AUTH_PASS` |
 | 서비스 삭제 | `gcloud run services delete onference --region asia-northeast3` |
 
 리전을 서울(`asia-northeast3`)이 아닌 곳에 배포했다면 위 명령의 `--region` 값을 바꾼다.
 어디에 있는지 모르면 `gcloud run services list` 로 확인한다.
+
+### 비밀번호 창에서 로그인이 안 될 때
+
+주소를 열었을 때 나오는 **사용자 이름 / 비밀번호** 창은 구글 로그인이 아니라 주소에 건
+Basic 인증이다. 들어가지 못한다면 순서대로 확인한다.
+
+```bash
+# 1) 지금 무엇이 걸려 있는지 확인 (사용자 이름·비밀번호가 그대로 출력된다)
+cd ~/onference && bash deploy/show-config.sh
+
+# 2) 영문+숫자로 다시 설정
+AUTH_USER=staff AUTH_PASS='onference2026' bash deploy/deploy-cloudrun.sh
+
+# 3) 아예 떼고 구글 로그인만 쓰기
+gcloud run services update onference --region asia-northeast3 \
+  --remove-env-vars AUTH_USER,AUTH_PASS
+```
+
+**비밀번호에 한글을 쓰지 않는다.** Basic 인증의 자격증명 인코딩은 브라우저마다 달라
+(UTF-8 또는 ISO-8859-1), 한글은 후자로 아예 표현되지 않아 서버가 받을 방법이 없다.
+서버는 양쪽 인코딩을 모두 받아들이도록 되어 있지만, 한글은 원천적으로 전달이 불가능하다.
 
 ### 알아둘 점
 
