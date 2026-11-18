@@ -1,0 +1,25 @@
+# App Engine(표준) 배포용 설정 — 컨테이너 없이 올리고 싶을 때 사용한다.
+#   gcloud app deploy app.yaml
+#   → https://<프로젝트ID>.appspot.com
+#
+# 배포 시 App Engine 이 npm install 후 package.json 의 gcp-build(= npm run build)를 실행해
+# dist 를 만든 뒤 아래 entrypoint 로 서빙한다.
+
+runtime: nodejs22
+instance_class: F1
+entrypoint: node deploy/server.mjs dist
+
+automatic_scaling:
+  min_instances: 0
+  max_instances: 2
+
+env_variables:
+  TZ: "Asia/Seoul"
+  # 접근 제어가 필요하면 주석 해제 (배포 전 값 지정, 저장소에는 커밋하지 않는다)
+  # AUTH_USER: "staff"
+  # AUTH_PASS: "변경하세요"
+
+handlers:
+  - url: /.*
+    script: auto
+    secure: always

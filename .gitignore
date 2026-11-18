@@ -7,3 +7,6 @@ artifact
 
 # 접근 제어 파일 — 서버에만 둔다
 deploy/.htpasswd
+
+# Firebase 프로젝트 지정 파일 — 각자 환경에서 생성
+.firebaserc

@@ -73,6 +73,17 @@ npm run build:html  # 단일 HTML 파일(onference-dashboard.html) 재생성
 | 협업 | 변경 이력 | 전 엔터티 감사 로그 검색·내보내기 |
 | 설정 | 행사 설정·템플릿 | 행사 정보, 지원 패키지, 체크리스트 템플릿, 권한 |
 
+## 배포
+
+서버에 올려 웹 주소로 쓰려면 [`deploy/README.md`](deploy/README.md)를 본다.
+구글 클라우드는 [`deploy/GOOGLE_CLOUD.md`](deploy/GOOGLE_CLOUD.md) — Cloud Shell 에서 아래 3줄이면 HTTPS 주소가 나온다.
+
+```bash
+git clone <저장소> && cd onference
+gcloud config set project <프로젝트ID>
+bash deploy/deploy-cloudrun.sh
+```
+
 ## 설계 문서
 
 - [`docs/01_기능명세서.md`](docs/01_기능명세서.md) — 화면·기능 ID 체계 기반 기능 명세

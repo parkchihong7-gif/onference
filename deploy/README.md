@@ -8,10 +8,14 @@ ONFERENCE 는 **백엔드가 없는 정적 웹앱**이다. 빌드 결과(`dist/`
 
 ---
 
+> **구글 클라우드(GCP)를 쓰신다면 → [`GOOGLE_CLOUD.md`](GOOGLE_CLOUD.md)** 로 바로 가면 된다.
+> Cloud Shell 에서 명령 3줄이면 HTTPS 주소가 나온다.
+
 ## 선택지 비교
 
 | 방법 | 필요한 것 | 걸리는 시간 | 접근 제어 |
 |---|---|---|---|
+| ⓪ **Cloud Run (GCP)** | 구글 클라우드 프로젝트 | 5분 | Basic 인증 / IAP |
 | ① 파일 1개 업로드 | 웹 호스팅(FTP/웹루트) | 1분 | 서버 설정에 따름 |
 | ② Docker + nginx | Docker 가 설치된 서버 | 5분 | nginx basic auth |
 | ③ Node 상주 서비스 | Node 18+ 가 설치된 서버 | 5분 | 내장 Basic 인증 |
@@ -31,20 +35,33 @@ scp onference-dashboard.html user@서버:/var/www/html/onference.html
 # → https://서버주소/onference.html
 ```
 
-## ② Docker + nginx (사내 서버 권장)
+## ⓪ Cloud Run (구글 클라우드)
+
+```bash
+git clone https://github.com/parkchihong7-gif/onference.git && cd onference
+gcloud config set project <프로젝트ID>
+bash deploy/deploy-cloudrun.sh      # 비밀번호: AUTH_USER=staff AUTH_PASS=... 를 앞에 붙인다
+```
+
+자세한 내용은 [`GOOGLE_CLOUD.md`](GOOGLE_CLOUD.md).
+
+## ② Docker + nginx (사내 서버)
 
 ```bash
 git clone <저장소> && cd onference
-docker compose up -d --build
+docker compose up -d --build        # 루트 Dockerfile(Node 서버, 8080) 사용
 # → http://서버주소:8080
 ```
+
+nginx 로 서빙하려면 `docker-compose.yml` 의 `dockerfile` 을 `deploy/Dockerfile.nginx` 로,
+포트를 `"8080:80"` 으로 바꾼다.
 
 접근 제어가 필요하면:
 
 ```bash
-htpasswd -c deploy/.htpasswd staff          # 계정 생성
-# deploy/nginx.conf 의 auth_basic 2줄 주석 해제
-# deploy/Dockerfile 의 COPY deploy/.htpasswd 줄 주석 해제
+# (nginx 사용 시) htpasswd -c deploy/.htpasswd staff
+#   → deploy/nginx.conf 의 auth_basic 2줄, deploy/Dockerfile.nginx 의 COPY 줄 주석 해제
+# (기본 Node 서버 사용 시) docker-compose.yml 의 AUTH_USER / AUTH_PASS 주석 해제
 docker compose up -d --build
 ```
 

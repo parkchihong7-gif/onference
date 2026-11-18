@@ -19,6 +19,8 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { timingSafeEqual } from 'node:crypto'
+import { createGzip } from 'node:zlib'
+import { pipeline } from 'node:stream'
 
 const PORT = Number(process.env.PORT ?? process.argv[3] ?? 8080)
 const HOST = process.env.HOST ?? '0.0.0.0'
@@ -88,15 +90,25 @@ const server = createServer((req, res) => {
 
   const ext = extname(file).toLowerCase()
   const immutable = file.includes(`${sep}assets${sep}`)   // 해시가 붙은 산출물만 장기 캐시
+  const type = MIME[ext] ?? 'application/octet-stream'
+  const size = statSync(file).size
+  // 텍스트 자산은 gzip 으로 보낸다 (번들 544KB → 약 145KB)
+  const compressible = /text\/|javascript|json|svg/.test(type) && size > 1024
+  const wantsGzip = /\bgzip\b/.test(req.headers['accept-encoding'] ?? '')
+  const gzip = compressible && wantsGzip
+
   res.writeHead(200, {
-    'Content-Type': MIME[ext] ?? 'application/octet-stream',
-    'Content-Length': statSync(file).size,
+    'Content-Type': type,
+    ...(gzip ? { 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' } : { 'Content-Length': size }),
     'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'same-origin',
   })
   if (req.method === 'HEAD') return res.end()
-  createReadStream(file).pipe(res)
+
+  const stream = createReadStream(file)
+  if (!gzip) return stream.pipe(res)
+  pipeline(stream, createGzip(), res, err => { if (err) res.destroy() })
 })
 
 server.listen(PORT, HOST, () => {

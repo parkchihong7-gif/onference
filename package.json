@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "build:html": "node scripts/build-html.mjs",
-    "serve": "node deploy/server.mjs dist"
+    "serve": "node deploy/server.mjs dist",
+    "gcp-build": "npm run build"
   },
   "dependencies": {
     "react": "^19.1.0",

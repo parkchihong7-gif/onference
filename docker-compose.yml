@@ -2,13 +2,21 @@
 #   git clone <저장소> && cd onference
 #   docker compose up -d --build
 #   → http://<서버주소>:8080
+#
+# nginx 로 서빙하고 싶으면 dockerfile 을 deploy/Dockerfile.nginx 로 바꾸고
+# 포트를 "8080:80" 으로 지정한다.
 services:
   onference:
     build:
       context: .
-      dockerfile: deploy/Dockerfile
+      dockerfile: Dockerfile
     image: onference:latest
     container_name: onference
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8080:8080"
+    environment:
+      # 접근 제어가 필요하면 주석 해제 (값은 서버에서만 지정)
+      # AUTH_USER: staff
+      # AUTH_PASS: 변경하세요
+      TZ: Asia/Seoul
