@@ -62,11 +62,24 @@ bash deploy/deploy-cloudrun.sh
 | 직전 버전으로 되돌리기 | `gcloud run services update-traffic onference --region asia-northeast3 --to-revisions <리비전이름>=100` |
 | 실시간 로그 보기 | `gcloud beta run services logs tail onference --region asia-northeast3` |
 | **현재 설정·주소 확인** | `bash deploy/show-config.sh` |
+| 구글 로그인 승인 도메인 등록 | `bash deploy/authorize-domain.sh` |
 | 비밀번호 떼기 | `gcloud run services update onference --region asia-northeast3 --remove-env-vars AUTH_USER,AUTH_PASS` |
 | 서비스 삭제 | `gcloud run services delete onference --region asia-northeast3` |
 
 리전을 서울(`asia-northeast3`)이 아닌 곳에 배포했다면 위 명령의 `--region` 값을 바꾼다.
 어디에 있는지 모르면 `gcloud run services list` 로 확인한다.
+
+### 구글 로그인 창이 "승인되지 않은 도메인" 이라고 할 때
+
+구글 로그인은 **앱이 떠 있는 도메인이 승인 목록에 있어야** 동작한다. 기본 목록에는
+`localhost` 와 `<프로젝트>.firebaseapp.com` 만 있고 Cloud Run 주소(`*.run.app`)는 없다.
+
+```bash
+cd ~/onference && bash deploy/authorize-domain.sh
+```
+
+`setup-firebase.sh` 는 마지막 단계에서 이 등록까지 자동으로 한다. 콘솔에서 직접 해도 된다 —
+Authentication → 설정 → 승인된 도메인 → 도메인 추가.
 
 ### 비밀번호 창에서 로그인이 안 될 때
 

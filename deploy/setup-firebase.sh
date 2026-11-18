@@ -11,6 +11,7 @@
 #   4) 역할별 접근 규칙 배포
 #   5) 초기 데이터 업로드 + 관리자 초대
 #   6) 설정을 넣어 Cloud Run 재배포 → 주소 출력
+#   7) 배포 주소를 구글 로그인 '승인된 도메인'에 등록
 #
 # 옵션
 #   --admin  <이메일>   관리자(사무국)로 초대할 구글 계정. 쉼표로 여러 명 가능 (필수)
@@ -129,7 +130,7 @@ SEED_ARGS=(--project "${PROJECT_ID}" --admin "${ADMIN}")
 has empty "$@" && SEED_ARGS+=(--empty)
 node scripts/seed-firestore.mjs "${SEED_ARGS[@]}"
 
-echo "[6/6] 공동 작업 설정을 넣어 재배포"
+echo "[6/7] 공동 작업 설정을 넣어 재배포"
 FIREBASE_API_KEY="${API_KEY}" \
 FIREBASE_PROJECT_ID="${PROJECT_ID}" \
 FIREBASE_APP_ID="${APP_ID}" \
@@ -138,6 +139,14 @@ ALLOWED_DOMAIN="${DOMAIN:-}" \
 AUTH_USER="${AUTH_USER:-}" AUTH_PASS="${AUTH_PASS:-}" \
 REGION="${REGION}" SERVICE="${SERVICE}" \
 bash deploy/deploy-cloudrun.sh
+
+echo
+echo "[7/7] 배포 주소를 구글 로그인 승인 도메인에 등록"
+PROJECT_ID="${PROJECT_ID}" SERVICE="${SERVICE}" REGION="${REGION}" \
+  bash deploy/authorize-domain.sh || {
+    echo "   ⚠ 자동 등록에 실패했습니다. 콘솔에서 직접 추가하세요:" >&2
+    echo "   Authentication → 설정 → 승인된 도메인" >&2
+  }
 
 cat <<MSG
 
