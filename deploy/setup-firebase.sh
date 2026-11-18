@@ -18,6 +18,10 @@
 #   --region <리전>     Cloud Run 리전 (기본: asia-northeast3)
 #   --empty             데모 데이터 없이 빈 상태로 시작
 #   --domain <도메인>   해당 도메인 계정만 로그인 허용 (예: example.org)
+#
+# 환경 변수
+#   AUTH_USER / AUTH_PASS   같이 주면 주소 자체에 비밀번호(Basic 인증)를 건 채로 배포한다
+#     예) AUTH_USER=staff AUTH_PASS='비밀번호' bash deploy/setup-firebase.sh --admin you@example.org
 
 set -euo pipefail
 
@@ -55,6 +59,11 @@ if [[ -z "${PROJECT_ID}" || "${PROJECT_ID}" == "(unset)" ]]; then
 fi
 
 echo "▶ 프로젝트: ${PROJECT_ID} / 리전: ${REGION} / 관리자: ${ADMIN}"
+if [[ -n "${AUTH_USER:-}" && -n "${AUTH_PASS:-}" ]]; then
+  echo "▶ 주소 접근 비밀번호(Basic 인증)도 함께 겁니다 — 사용자: ${AUTH_USER}"
+elif [[ -n "${AUTH_USER:-}${AUTH_PASS:-}" ]]; then
+  echo "⚠ AUTH_USER 와 AUTH_PASS 는 둘 다 지정해야 합니다. 비밀번호 없이 진행합니다." >&2
+fi
 echo
 
 # 로컬에 설치된 firebase CLI 를 쓴다(없으면 npx 로 내려받음)
@@ -126,6 +135,7 @@ FIREBASE_PROJECT_ID="${PROJECT_ID}" \
 FIREBASE_APP_ID="${APP_ID}" \
 FIREBASE_AUTH_DOMAIN="${AUTH_DOMAIN}" \
 ALLOWED_DOMAIN="${DOMAIN:-}" \
+AUTH_USER="${AUTH_USER:-}" AUTH_PASS="${AUTH_PASS:-}" \
 REGION="${REGION}" SERVICE="${SERVICE}" \
 bash deploy/deploy-cloudrun.sh
 

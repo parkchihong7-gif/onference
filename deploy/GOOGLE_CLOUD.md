@@ -55,6 +55,7 @@ bash deploy/deploy-cloudrun.sh
 | 비밀번호 걸고 배포 | `AUTH_USER=staff AUTH_PASS='비밀번호' bash deploy/deploy-cloudrun.sh` |
 | 비밀번호 바꾸기 | 위와 같은 명령을 새 비밀번호로 다시 실행 |
 | 공동 작업(Firestore) 켜기 | `bash deploy/setup-firebase.sh --admin 본인구글계정` (끝에서 재배포까지 자동) |
+| 공동 작업 + 비밀번호 한 번에 | `AUTH_USER=staff AUTH_PASS='비밀번호' bash deploy/setup-firebase.sh --admin 본인구글계정` |
 | 현재 주소 확인 | `gcloud run services describe onference --region asia-northeast3 --format='value(status.url)'` |
 | 현재 설정(환경 변수) 확인 | `gcloud run services describe onference --region asia-northeast3 --format='value(spec.template.spec.containers[0].env)'` |
 | 배포 이력 보기 | `gcloud run revisions list --service onference --region asia-northeast3` |
@@ -146,6 +147,29 @@ FIREBASE_API_KEY='AIza...' FIREBASE_PROJECT_ID='<프로젝트ID>' FIREBASE_APP_I
 
 `ALLOWED_DOMAIN` 은 선택이다(지정하면 해당 도메인 계정만 로그인 가능).
 배포 후 주소를 열면 **구글 계정 로그인 화면**이 뜨고, 초대된 계정만 들어갈 수 있다.
+
+### 공동 작업과 비밀번호를 한 번에 켜기
+
+`setup-firebase.sh` 는 마지막에 Cloud Run 재배포까지 하므로, 비밀번호 설정을 앞에 붙이면 한 번에 끝난다.
+
+```bash
+AUTH_USER=staff AUTH_PASS='원하는비밀번호' \
+  bash deploy/setup-firebase.sh --admin 본인구글계정@gmail.com
+```
+
+이렇게 하면 **잠금이 두 겹**이 된다.
+
+| 겹 | 무엇 | 누구에게 보이나 |
+|---|---|---|
+| 1 | 주소 자체의 비밀번호(Basic 인증) | 브라우저가 아이디/비밀번호를 묻는다. 링크가 유출돼도 페이지가 열리지 않는다 |
+| 2 | 구글 로그인 | 초대된 계정만 데이터를 읽고 쓸 수 있다(역할별 권한 적용) |
+
+1번은 팀원 전원이 같은 아이디/비밀번호를 공유하고, 2번이 개인 식별과 권한을 담당한다.
+팀원에게는 **주소 + 공용 비밀번호**를 알려주고, 각자 본인 구글 계정으로 로그인하게 하면 된다.
+
+> 비밀번호 없이 구글 로그인만으로 충분하다면 `AUTH_USER`/`AUTH_PASS` 를 빼면 된다.
+> 데이터는 어차피 로그인한 초대 계정만 접근할 수 있다. 비밀번호는 "링크를 아는 외부인이
+> 로그인 화면조차 보지 못하게" 하는 추가 장치다.
 
 ### 4) 담당자 추가
 
