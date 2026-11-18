@@ -6,6 +6,7 @@ import { ddayLabel, flag, fmtDate, krwShort, today } from '../lib/format'
 import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
+import { NewSpeakerDialog } from '../components/Create'
 import type { PipelineStage } from '../types'
 
 const COLUMNS: PipelineStage[] = [...PIPELINE_ORDER, '거절']
@@ -15,6 +16,7 @@ export function Pipeline() {
   const list = speakersOf(state)
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
 
   const drop = (stage: PipelineStage) => {
     if (dragId) dispatch({ type: 'SET_STAGE', id: dragId, stage })
@@ -31,7 +33,12 @@ export function Pipeline() {
             변경 이력이 자동 기록됩니다. 회신 기한이 지난 카드는 경고로 표시됩니다.
           </p>
         </div>
+        <div className="row-wrap no-print">
+          <button className="btn btn-primary" onClick={() => setAdding(true)}>＋ 연자 추가</button>
+        </div>
       </div>
+
+      <NewSpeakerDialog open={adding} onClose={() => setAdding(false)} />
 
       <div className="kanban">
         {COLUMNS.map(col => {

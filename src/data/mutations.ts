@@ -183,6 +183,57 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
       return muts
     }
 
+    case 'ADD_CONFERENCE': {
+      const muts: Mutation[] = [
+        { kind: 'set', col: 'conferences', id: action.conference.id, data: action.conference as unknown as Record<string, unknown> },
+        ...action.sessions.map(x => ({ kind: 'set' as const, col: 'sessions' as const, id: x.id, data: x as unknown as Record<string, unknown> })),
+        ...action.tasks.map(x => ({ kind: 'set' as const, col: 'tasks' as const, id: x.id, data: x as unknown as Record<string, unknown> })),
+      ]
+      muts.push(auditMut(actor, {
+        action: '생성', entityType: '행사', entityId: action.conference.id, entityLabel: action.conference.nameKo,
+        field: '행사 생성', after: `${action.conference.scope} · ${action.conference.startDate}`,
+        memo: `업무 ${action.tasks.length}건 · 세션 ${action.sessions.length}건 자동 생성`,
+      }))
+      return muts
+    }
+
+    case 'PATCH_CONFERENCE': {
+      const conf = state.conferences.find(c => c.id === action.id)
+      if (!conf) return []
+      return [
+        { kind: 'patch', col: 'conferences', id: conf.id, data: action.patch as Record<string, unknown> },
+        auditMut(actor, { action: '수정', entityType: '행사', entityId: conf.id, entityLabel: conf.nameKo, field: '행사 정보', after: '수정됨' }),
+      ]
+    }
+
+    case 'ADD_SPEAKER': {
+      const name = action.speaker.nameKo || action.speaker.nameEn
+      return [
+        { kind: 'set', col: 'speakers', id: action.speaker.id, data: action.speaker as unknown as Record<string, unknown> },
+        ...action.tasks.map(x => ({ kind: 'set' as const, col: 'tasks' as const, id: x.id, data: x as unknown as Record<string, unknown> })),
+        auditMut(actor, {
+          action: '생성', entityType: '연사', entityId: action.speaker.id, entityLabel: name,
+          field: '연자 등록', after: `${action.speaker.tier} · ${action.speaker.residency}`,
+          memo: action.tasks.length ? `업무 ${action.tasks.length}건 자동 생성` : undefined,
+        }),
+      ]
+    }
+
+    case 'ADD_SESSION':
+      return [
+        { kind: 'set', col: 'sessions', id: action.session.id, data: action.session as unknown as Record<string, unknown> },
+        auditMut(actor, { action: '생성', entityType: '세션', entityId: action.session.id, entityLabel: action.session.title, field: '세션 등록', after: `${action.session.date} ${action.session.startTime}` }),
+      ]
+
+    case 'DELETE_SESSION': {
+      const ses = state.sessions.find(x => x.id === action.id)
+      if (!ses) return []
+      return [
+        { kind: 'delete', col: 'sessions', id: ses.id },
+        auditMut(actor, { action: '삭제', entityType: '세션', entityId: ses.id, entityLabel: ses.title, field: '세션 삭제' }),
+      ]
+    }
+
     case 'TOGGLE_MODULE': {
       const conf = state.conferences.find(c => c.id === action.conferenceId)
       if (!conf) return []

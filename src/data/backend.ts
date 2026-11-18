@@ -51,7 +51,7 @@ export interface Backend {
   write(muts: Mutation[]): Promise<void>
   signIn?(): Promise<void>
   signOut?(): Promise<void>
-  reset?(): Promise<void>
+  reset?(next?: AppState): Promise<void>
   /** 공유 모드 전용 — 구성원 초대·회수 */
   listInvites?(): Promise<Invite[]>
   invite?(invite: Invite): Promise<void>
@@ -97,10 +97,11 @@ export class LocalBackend implements Backend {
     try { this.channel?.postMessage({ type: 'state', state: this.state }) } catch { /* noop */ }
   }
 
-  async reset() {
-    this.state = initialState
+  async reset(next?: AppState) {
+    this.state = next ?? initialState
     this.onState?.(this.state)
     this.persist()
+    try { this.channel?.postMessage({ type: 'state', state: this.state }) } catch { /* noop */ }
   }
 
   stop() { try { this.channel?.close() } catch { /* noop */ } }

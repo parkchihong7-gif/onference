@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  Abstract, AppState, Comment, Communication, CreditProgram, Deliverable, Doc,
-  ModuleKey, PipelineStage, Registration, Speaker, Sponsor, Task, VisaStage,
+  Abstract, AppState, Comment, Communication, Conference, CreditProgram, Deliverable, Doc,
+  ModuleKey, PipelineStage, Registration, Session, Speaker, Sponsor, Task, VisaStage,
 } from './types'
 import { initialState } from './data/seed'
 import { LocalBackend } from './data/backend'
@@ -29,6 +29,11 @@ export type Action =
   | { type: 'PATCH_REGISTRATION'; id: string; patch: Partial<Registration> }
   | { type: 'PATCH_SPONSOR'; id: string; patch: Partial<Sponsor> }
   | { type: 'PATCH_CREDIT'; id: string; patch: Partial<CreditProgram> }
+  | { type: 'ADD_CONFERENCE'; conference: Conference; sessions: Session[]; tasks: Task[] }
+  | { type: 'PATCH_CONFERENCE'; id: string; patch: Partial<Conference> }
+  | { type: 'ADD_SPEAKER'; speaker: Speaker; tasks: Task[] }
+  | { type: 'ADD_SESSION'; session: Session }
+  | { type: 'DELETE_SESSION'; id: string }
   | { type: 'TOGGLE_MODULE'; conferenceId: string; module: ModuleKey }
   | { type: 'RESET' }
 
@@ -43,7 +48,7 @@ interface Ctx {
   status: BackendStatus
   signIn: () => Promise<void>
   signOut: () => Promise<void>
-  reset: () => Promise<void>
+  reset: (next?: AppState) => Promise<void>
   /** 공유 모드 전용 — 구성원 초대 관리 */
   invites: {
     supported: boolean
@@ -57,12 +62,36 @@ const AppCtx = createContext<Ctx | null>(null)
 
 const LOCAL_STATUS: BackendStatus = { mode: '로컬', connected: true, needsSignIn: false, pending: 0 }
 
+/**
+ * 어떤 행사를 보고 있는지 / 누구로 보고 있는지는 "내 화면의 선택"이지 공유 데이터가 아니다.
+ * 백엔드 스냅샷에는 다른 사람이 고른 값이 담겨 오므로, 내 선택을 덮어쓰지 않도록 따로 보관한다.
+ */
+const VIEW_KEY = 'onference.view'
+type View = { conferenceId?: string; userId?: string }
+const loadView = (): View => {
+  try { return JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}') as View } catch { return {} }
+}
+const saveView = (v: View) => {
+  try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)) } catch { /* 저장 불가 환경은 무시 */ }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(initialState)
   const [status, setStatus] = useState<BackendStatus>(LOCAL_STATUS)
   const backendRef = useRef<Backend | null>(null)
   const stateRef = useRef<AppState>(initialState)
   stateRef.current = state
+  const viewRef = useRef<View>(loadView())
+
+  /** 백엔드 스냅샷에 내 화면 선택을 덧씌운다(선택한 행사가 사라졌으면 스냅샷 값을 따른다) */
+  const applySnapshot = useCallback((s: AppState) => {
+    const v = viewRef.current
+    const conf = v.conferenceId && s.conferences.some(c => c.id === v.conferenceId)
+      ? v.conferenceId : s.activeConferenceId
+    const user = v.userId && s.members.some(m => m.id === v.userId)
+      ? v.userId : s.currentUserId
+    setState({ ...s, activeConferenceId: conf, currentUserId: user })
+  }, [])
 
   useEffect(() => {
     let disposed = false
@@ -78,29 +107,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       if (disposed) return
       backendRef.current = backend
-      await backend.start(
-        s => setState(s),
-        st => setStatus(st),
-      )
+      await backend.start(applySnapshot, st => setStatus(st))
     })().catch((e: unknown) => {
       setStatus({ mode: '로컬', connected: true, needsSignIn: false, pending: 0, error: `설정 로딩 실패: ${String(e)}` })
       const local = new LocalBackend()
       backendRef.current = local
-      void local.start(s => setState(s), st => setStatus(st))
+      void local.start(applySnapshot, st => setStatus(st))
     })
     return () => { disposed = true; backendRef.current?.stop() }
-  }, [])
+  }, [applySnapshot])
 
   const dispatch = useCallback((action: Action) => {
     // 화면 전환·사용자 선택처럼 저장이 필요 없는 액션
     if (isLocalOnly(action)) {
-      if (action.type === 'SET_CONFERENCE') setState(s => ({ ...s, activeConferenceId: action.id }))
-      else if (action.type === 'SET_USER') setState(s => ({ ...s, currentUserId: action.id }))
-      else if (action.type === 'RESET') void backendRef.current?.reset?.()
+      if (action.type === 'SET_CONFERENCE') {
+        viewRef.current = { ...viewRef.current, conferenceId: action.id }
+        saveView(viewRef.current)
+        setState(s => ({ ...s, activeConferenceId: action.id }))
+      } else if (action.type === 'SET_USER') {
+        viewRef.current = { ...viewRef.current, userId: action.id }
+        saveView(viewRef.current)
+        setState(s => ({ ...s, currentUserId: action.id }))
+      } else if (action.type === 'RESET') {
+        viewRef.current = {}
+        saveView(viewRef.current)
+        void backendRef.current?.reset?.()
+      }
       return
     }
     const muts = mutationsFor(stateRef.current, action)
     if (!muts.length) return
+    // 새 행사를 만들면 바로 그 행사로 전환한다
+    if (action.type === 'ADD_CONFERENCE') {
+      const newId = action.conference.id
+      viewRef.current = { ...viewRef.current, conferenceId: newId }
+      saveView(viewRef.current)
+      setState(s => ({ ...applyMutations(s, muts), activeConferenceId: newId }))
+      backendRef.current?.write(muts).catch((e: unknown) => setStatus(st => ({ ...st, error: `저장 실패: ${String(e)}` })))
+      return
+    }
     // 낙관적 반영 — 공유 모드에서도 즉시 화면이 바뀌고, 이후 서버 스냅샷으로 교정된다
     setState(s => applyMutations(s, muts))
     backendRef.current?.write(muts).catch((e: unknown) => {
@@ -110,7 +155,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async () => { await backendRef.current?.signIn?.() }, [])
   const signOut = useCallback(async () => { await backendRef.current?.signOut?.() }, [])
-  const reset = useCallback(async () => { await backendRef.current?.reset?.() }, [])
+  const reset = useCallback(async (next?: AppState) => {
+    // 초기화하면 화면 선택도 함께 비운다(새로 만든 행사가 활성 행사가 된다)
+    viewRef.current = next ? { conferenceId: next.activeConferenceId } : {}
+    saveView(viewRef.current)
+    await backendRef.current?.reset?.(next)
+  }, [])
 
   const invites = useMemo(() => ({
     supported: status.mode === '공유',

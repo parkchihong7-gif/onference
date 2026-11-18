@@ -279,3 +279,44 @@ export function StackBar({ segments, height = 10, valueFormat }: {
     </div>
   )
 }
+
+/** 가운데 정렬 모달 — 신규 등록 폼 등에 사용 */
+export function Modal({ open, title, sub, onClose, children, footer, wide }: {
+  open: boolean; title: string; sub?: string; onClose: () => void
+  children: ReactNode; footer?: ReactNode; wide?: boolean
+}) {
+  useEffect(() => {
+    if (!open) return
+    const on = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [open, onClose])
+  if (!open) return null
+  return (
+    <>
+      <div className="drawer-scrim" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="modal-box" style={{ width: wide ? 'min(820px, 94vw)' : 'min(560px, 94vw)' }}>
+        <header className="modal-head">
+          <div>
+            <h2 style={{ fontSize: 17 }}>{title}</h2>
+            {sub && <div className="small muted" style={{ marginTop: 3 }}>{sub}</div>}
+          </div>
+          <button className="btn btn-ghost" onClick={onClose} aria-label="닫기">✕</button>
+        </header>
+        <div className="modal-body">{children}</div>
+        {footer && <footer className="modal-foot">{footer}</footer>}
+      </div>
+    </>
+  )
+}
+
+/** 폼 입력 한 칸 */
+export function Field({ label, hint, children, span }: { label: string; hint?: string; children: ReactNode; span?: boolean }) {
+  return (
+    <label className="field" style={span ? { gridColumn: '1 / -1' } : undefined}>
+      <span className="field-label">{label}</span>
+      {children}
+      {hint && <span className="field-hint">{hint}</span>}
+    </label>
+  )
+}

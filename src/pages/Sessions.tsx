@@ -4,9 +4,12 @@ import { Badge, Card, StatTile } from '../components/ui'
 import { flag, fmtDate } from '../lib/format'
 import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
+import { useState } from 'react'
+import { NewSessionDialog } from '../components/Create'
 
 export function Sessions() {
   const { state } = useApp()
+  const [adding, setAdding] = useState(false)
   const conf = activeConference(state)
   const sessions = sessionsOf(state)
   const days = [...new Set(sessions.map(s => s.date))].sort()
@@ -23,7 +26,12 @@ export function Sessions() {
             관리되며 연사 배정은 제출물 기한과 연동됩니다.
           </p>
         </div>
+        <div className="row-wrap no-print">
+          <button className="btn btn-primary" onClick={() => setAdding(true)}>＋ 세션 추가</button>
+        </div>
       </div>
+
+      <NewSessionDialog open={adding} onClose={() => setAdding(false)} />
 
       <div className="grid g4">
         <StatTile label="세션" value={sessions.length} unit="개" foot={`${conf.tracks.length}개 트랙 · ${days.length}일`} />

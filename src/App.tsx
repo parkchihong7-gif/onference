@@ -6,6 +6,7 @@ import { hasModule, labelsOf, needsOverseasModules, overseasSpeakers } from './l
 import { ddayLabel, today } from './lib/format'
 import { Search } from './components/Search'
 import { AuthGate } from './components/AuthGate'
+import { NewConferenceDialog } from './components/Create'
 import { Dashboard } from './pages/Dashboard'
 import { Pipeline } from './pages/Pipeline'
 import { Workspace } from './pages/Workspace'
@@ -71,6 +72,7 @@ export function App() {
   const overseas = overseasSpeakers(state)
   const [theme, setTheme] = useState(document.documentElement.dataset.theme ?? 'light')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [newConfOpen, setNewConfOpen] = useState(false)
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -145,6 +147,7 @@ export function App() {
               <option key={c.id} value={c.id}>[{c.scope}] {c.nameKo} ({c.code})</option>
             ))}
           </select>
+          <button className="btn btn-sm no-print" onClick={() => setNewConfOpen(true)} title="새 행사 만들기">＋ 새 행사</button>
           <span className="chip nowrap">{conf.startDate.replace(/-/g, '.')} ~ {conf.endDate.slice(5).replace('-', '.')}</span>
           <span className="chip nowrap" title="행사 시작일까지 남은 일수">개막 {ddayLabel(conf.startDate)}</span>
           <span className="chip nowrap">{conf.venue.split(' ')[0]} · {conf.city}</span>
@@ -206,6 +209,7 @@ export function App() {
       </div>
 
       <Search open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <NewConferenceDialog open={newConfOpen} onClose={() => setNewConfOpen(false)} />
     </div>
     </AuthGate>
   )

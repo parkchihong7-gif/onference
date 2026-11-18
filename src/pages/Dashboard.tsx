@@ -6,9 +6,14 @@ import { displayName, hasModule, labelsOf, overseasSpeakers } from '../lib/scope
 import { addDays } from '../data/seed'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
+import { useState } from 'react'
+import { NewSpeakerDialog, NewSessionDialog, NewConferenceDialog } from '../components/Create'
 
 export function Dashboard() {
   const { state } = useApp()
+  const [addSpeaker, setAddSpeaker] = useState(false)
+  const [addSession, setAddSession] = useState(false)
+  const [addConf, setAddConf] = useState(false)
   const conf = activeConference(state)
   const list = speakersOf(state)
   const k = kpis(state)
@@ -75,18 +80,98 @@ export function Dashboard() {
     : addDays(conf.endDate, 7)
 
   const budgetPct = pct(k.budgetCommitKRW, k.budgetPlanKRW)
+  const confSessions = state.sessions.filter(x => x.conferenceId === conf.id)
+  /** 새로 만든 행사는 장소·주최가 비어 있을 수 있으므로 빈 값은 구분자와 함께 생략한다 */
+  const confMeta = [
+    conf.nameEn, conf.venue || conf.city,
+    conf.host ? `주최 ${conf.host}${conf.organizer && conf.organizer !== conf.host ? ` / 주관 ${conf.organizer}` : ''}` : '',
+    conf.pco ? `운영 ${conf.pco}` : '',
+  ].filter(Boolean).join(' · ')
+
+  if (list.length === 0) {
+    return (
+      <>
+        <NewSpeakerDialog open={addSpeaker} onClose={() => setAddSpeaker(false)} />
+        <NewSessionDialog open={addSession} onClose={() => setAddSession(false)} />
+        <NewConferenceDialog open={addConf} onClose={() => setAddConf(false)} />
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">{conf.nameKo}</h1>
+            <p className="page-desc">
+              {[conf.scope, conf.venue || conf.city].filter(Boolean).join(' · ')} · 개막 {fmtDate(conf.startDate)} ({ddayLabel(conf.startDate)})
+              <br />아직 등록된 {labels.speaker}가 없습니다. 아래 순서대로 행사 준비를 시작하세요.
+            </p>
+          </div>
+        </div>
+
+        <Card title="행사 준비 시작하기" sub="① 행사 정보 → ② 세션/프로그램 → ③ 연자 등록 순으로 진행하면 체크리스트·일정·리스크가 자동 생성됩니다.">
+          <div className="start-steps">
+            <div className="start-step">
+              <div className="start-num">1</div>
+              <div style={{ flex: 1 }}>
+                <strong>행사 기본 정보 · 모듈</strong>
+                <p className="muted small">국내/국제 구분, 사용할 업무 모듈(초록심사·연수평점·참가등록 등), 일정·장소·예산을 확인합니다.</p>
+                <div className="row-wrap">
+                  <button className="btn btn-sm" onClick={() => go('settings')}>행사 설정 열기</button>
+                  <button className="btn btn-sm" onClick={() => setAddConf(true)}>＋ 다른 행사 새로 만들기</button>
+                </div>
+              </div>
+            </div>
+            <div className="start-step">
+              <div className="start-num">2</div>
+              <div style={{ flex: 1 }}>
+                <strong>세션 · 프로그램 구성</strong>
+                <p className="muted small">
+                  현재 {confSessions.length}개 세션. 세션을 먼저 만들면 연자 배정과 제출물 기한이 자동으로 연동됩니다.
+                </p>
+                <div className="row-wrap">
+                  <button className="btn btn-sm btn-primary" onClick={() => setAddSession(true)}>＋ 세션 추가</button>
+                  <button className="btn btn-sm" onClick={() => go('sessions')}>세션 목록</button>
+                </div>
+              </div>
+            </div>
+            <div className="start-step">
+              <div className="start-num">3</div>
+              <div style={{ flex: 1 }}>
+                <strong>{labels.speaker} 등록</strong>
+                <p className="muted small">
+                  연자를 등록하면 {conf.scope === '국제' ? '사증·항공·숙박·해외송금' : '교통·숙박·원고·동의서'} 업무와 제출물 체크리스트가 자동 생성됩니다.
+                </p>
+                <div className="row-wrap">
+                  <button className="btn btn-sm btn-primary" onClick={() => setAddSpeaker(true)}>＋ {labels.speaker} 추가</button>
+                  <button className="btn btn-sm" onClick={() => go('pipeline')}>초청 파이프라인</button>
+                </div>
+              </div>
+            </div>
+            <div className="start-step">
+              <div className="start-num">4</div>
+              <div style={{ flex: 1 }}>
+                <strong>공동 작업자 초대</strong>
+                <p className="muted small">사무국·여행사·재무 담당자를 역할별로 초대하면 같은 데이터를 실시간으로 함께 보며 작업합니다.</p>
+                <div className="row-wrap">
+                  <button className="btn btn-sm" onClick={() => go('settings')}>멤버 초대</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </>
+    )
+  }
 
   return (
     <>
+      <NewSpeakerDialog open={addSpeaker} onClose={() => setAddSpeaker(false)} />
       <div className="page-head">
         <div>
           <h1 className="page-title">{conf.nameKo}</h1>
           <p className="page-desc">
-            {conf.nameEn} · {conf.venue} · 주최 {conf.host} / 주관 {conf.organizer} · 운영 {conf.pco}
-            <br />개막 {fmtDate(conf.startDate)} ({ddayLabel(conf.startDate)}) · 예상 참가 {conf.expectedAttendees.toLocaleString()}명 · 트랙 {conf.tracks.length}개
+            {confMeta}
+            {confMeta && <br />}개막 {fmtDate(conf.startDate)} ({ddayLabel(conf.startDate)}) · 예상 참가 {conf.expectedAttendees.toLocaleString()}명 · 트랙 {conf.tracks.length}개
           </p>
         </div>
         <div className="row-wrap no-print">
+          <button className="btn btn-primary" onClick={() => setAddSpeaker(true)}>＋ {labels.speaker} 추가</button>
           <button className="btn" onClick={() => go('pipeline')}>초청 파이프라인</button>
           <button className="btn btn-primary" onClick={() => go('risks')}>리스크 점검 ({risks.length})</button>
         </div>

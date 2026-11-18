@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../store'
 import type { Invite } from '../data/backend'
+import { NewConferenceDialog } from '../components/Create'
 import { activeConference } from '../lib/metrics'
 import { Badge, Card, DL, StatTile } from '../components/ui'
 import { CORE_MODULES, DOMESTIC_MODULES, OVERSEAS_MODULES } from '../types'
@@ -18,6 +19,8 @@ export function Settings() {
   const [name, setName] = useState('')
   const [role, setRole] = useState<string>('리에종')
   const [msg, setMsg] = useState('')
+  const [newConf, setNewConf] = useState(false)
+  const [freshConf, setFreshConf] = useState(false)
   const canInvite = invites.supported && status.user?.role === '사무국'
 
   useEffect(() => {
@@ -56,7 +59,11 @@ export function Settings() {
             신규 연자 등록 시 업무·제출물·기한이 자동 생성됩니다.
           </p>
         </div>
-        <button className="btn no-print" onClick={reset}>↺ 데모 데이터 초기화</button>
+        <div className="row-wrap no-print">
+          <button className="btn btn-primary" onClick={() => setNewConf(true)}>＋ 새 행사 만들기</button>
+          <button className="btn" onClick={() => setFreshConf(true)}>⌦ 전체 비우고 새 행사 시작</button>
+          <button className="btn" onClick={() => reset()}>↺ 데모 데이터로 되돌리기</button>
+        </div>
       </div>
 
       <div className="grid g4">
@@ -67,6 +74,9 @@ export function Settings() {
           foot={`${state.checklistTemplates.length}개 템플릿`} />
         <StatTile label="구성원" value={state.members.length} unit="명" foot={`${new Set(state.members.map(m => m.role)).size}개 역할`} />
       </div>
+
+      <NewConferenceDialog open={newConf} onClose={() => setNewConf(false)} />
+      <NewConferenceDialog fresh open={freshConf} onClose={() => setFreshConf(false)} />
 
       <Card title="데이터 저장 방식"
         sub={status.mode === '공유' ? '여러 담당자가 같은 데이터를 실시간으로 함께 봅니다' : '이 브라우저에만 저장됩니다'}>

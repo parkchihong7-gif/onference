@@ -6,6 +6,7 @@ import { flag, fmtDate, krwShort, toneOf } from '../lib/format'
 import { displayName } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
+import { NewSpeakerDialog } from '../components/Create'
 import type { Speaker } from '../types'
 
 const STAGES = ['전체', '후보발굴', '내부승인', '사전타진', '공식초청', '수락', '계약완료', '거절'] as const
@@ -19,6 +20,7 @@ export function Speakers() {
   const [tier, setTier] = useState('전체')
   const [liaison, setLiaison] = useState('전체')
   const [visaOnly, setVisaOnly] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   const rows = useMemo(() => all.filter(s => {
     if (stage !== '전체' && s.stage !== stage) return false
@@ -50,6 +52,7 @@ export function Speakers() {
 
   return (
     <>
+      <NewSpeakerDialog open={adding} onClose={() => setAdding(false)} />
       <div className="page-head">
         <div>
           <h1 className="page-title">연사·초청자 관리</h1>
@@ -60,7 +63,8 @@ export function Speakers() {
         </div>
         <div className="row-wrap no-print">
           <button className="btn" onClick={exportCsv}>⬇ Excel 내보내기</button>
-          <button className="btn btn-primary" onClick={() => go('pipeline')}>＋ 후보 등록(파이프라인)</button>
+          <button className="btn" onClick={() => go('pipeline')}>파이프라인 보기</button>
+          <button className="btn btn-primary" onClick={() => setAdding(true)}>＋ 연자 추가</button>
         </div>
       </div>
 
