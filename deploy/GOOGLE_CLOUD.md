@@ -81,6 +81,25 @@ cd ~/onference && bash deploy/authorize-domain.sh
 `setup-firebase.sh` 는 마지막 단계에서 이 등록까지 자동으로 한다. 콘솔에서 직접 해도 된다 —
 Authentication → 설정 → 승인된 도메인 → 도메인 추가.
 
+### 구글 로그인은 됐는데 "이 계정은 아직 초대되지 않았습니다" 가 뜰 때
+
+데이터 접근은 `memberInvites/<이메일>` 초대장이 있어야 허용된다. 초기 설정에서
+`--admin` 으로 넘긴 이메일에 초대장이 만들어지는데, 그 단계가 건너뛰어졌거나
+로그인한 계정의 이메일이 다르면 이 화면이 나온다.
+
+```bash
+cd ~/onference
+
+# 현재 초대장·구성원·데이터 적재 상태 확인
+node scripts/check-access.mjs
+
+# 해당 계정을 사무국 권한으로 초대
+node scripts/check-access.mjs --invite parkchihong7@gmail.com
+```
+
+등록 후 브라우저를 새로고침하고 다시 로그인하면 들어가진다. 이후 추가 인원은
+앱의 `행사 설정 · 모듈 → 구성원 초대` 에서 넣으면 된다.
+
 ### 비밀번호 창에서 로그인이 안 될 때
 
 주소를 열었을 때 나오는 **사용자 이름 / 비밀번호** 창은 구글 로그인이 아니라 주소에 건

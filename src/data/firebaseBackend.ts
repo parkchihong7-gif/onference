@@ -86,11 +86,18 @@ export class FirebaseBackend implements Backend {
       }
       // 초대된 사용자인지 확인 (members/{uid}), 없으면 초대장(memberInvites/{email})으로 승격
       let member: Member | undefined
+      let joinError = ''
       try {
         const snap = await getDoc(doc(this.db, 'members', u.uid))
         if (snap.exists()) member = snap.data() as Member
         else member = await this.claimInvite(u)
-      } catch { /* 권한 없음 — 아래에서 안내 */ }
+      } catch (e) {
+        // 원인을 숨기면 "초대되지 않았습니다" 로만 보여 해결이 어려워진다
+        const err = e as { code?: string; message?: string }
+        joinError = err.code === 'permission-denied'
+          ? '접근 규칙이 이 계정을 거부했습니다. 초대장의 이메일이 로그인한 계정과 같은지 확인하세요.'
+          : `확인 중 오류가 발생했습니다 (${err.code ?? ''} ${err.message ?? ''})`.trim()
+      }
 
       this.user = {
         uid: u.uid, name: member?.name ?? u.displayName ?? u.email ?? '사용자',
@@ -100,7 +107,7 @@ export class FirebaseBackend implements Backend {
       if (!member) {
         this.emitStatus({
           connected: false, needsSignIn: false,
-          error: '이 계정은 아직 초대되지 않았습니다. 사무국 담당자에게 접근 권한을 요청하세요.',
+          error: joinError || '이 계정은 아직 초대되지 않았습니다. 사무국 담당자에게 접근 권한을 요청하세요.',
         })
         return
       }
@@ -115,6 +122,7 @@ export class FirebaseBackend implements Backend {
     if (!email) return undefined
     const invite = await getDoc(doc(this.db, 'memberInvites', email))
     if (!invite.exists()) return undefined
+    // 여기서부터는 초대장이 확인된 상태이므로, 실패하면 그대로 올려보내 원인을 표시한다
     const data = invite.data() as { name?: string; role: string; org?: string; phone?: string }
     const member: Member = {
       id: u.uid,
