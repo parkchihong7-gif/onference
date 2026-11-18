@@ -20,6 +20,8 @@ Cloud Shell 은 이미 로그인된 상태이므로 별도 인증이 필요 없�
 
 ## ① Cloud Run (권장)
 
+### 최초 배포
+
 ```bash
 # 1) 소스 받기
 git clone https://github.com/parkchihong7-gif/onference.git
@@ -35,21 +37,42 @@ bash deploy/deploy-cloudrun.sh
 
 마지막 줄에 `✅ 배포 완료 / 주소: https://onference-xxxx.a.run.app` 이 출력된다. 그 주소가 끝이다.
 
-**비밀번호를 걸고 싶다면** (내부용이라 권장):
+### 코드를 고친 뒤 다시 배포 (가장 자주 쓰는 명령)
 
 ```bash
-AUTH_USER=staff AUTH_PASS='원하는비밀번호' bash deploy/deploy-cloudrun.sh
+cd ~/onference
+git pull
+bash deploy/deploy-cloudrun.sh
 ```
 
-브라우저가 아이디/비밀번호를 물어본다. 비밀번호를 바꿀 때는 같은 명령을 다시 실행하면 된다.
+환경 변수를 따로 주지 않으면 **이미 배포된 설정(Firestore·비밀번호)은 그대로 유지**되고 코드만 바뀐다.
 
-**갱신**: 소스를 당겨서 같은 명령을 다시 실행한다.
+### 자주 쓰는 명령 모음
 
-```bash
-git pull && bash deploy/deploy-cloudrun.sh
-```
+| 하고 싶은 것 | 명령 |
+|---|---|
+| 코드만 갱신해 재배포 | `git pull && bash deploy/deploy-cloudrun.sh` |
+| 비밀번호 걸고 배포 | `AUTH_USER=staff AUTH_PASS='비밀번호' bash deploy/deploy-cloudrun.sh` |
+| 비밀번호 바꾸기 | 위와 같은 명령을 새 비밀번호로 다시 실행 |
+| 공동 작업(Firestore) 켜기 | `bash deploy/setup-firebase.sh --admin 본인구글계정` (끝에서 재배포까지 자동) |
+| 현재 주소 확인 | `gcloud run services describe onference --region asia-northeast3 --format='value(status.url)'` |
+| 현재 설정(환경 변수) 확인 | `gcloud run services describe onference --region asia-northeast3 --format='value(spec.template.spec.containers[0].env)'` |
+| 배포 이력 보기 | `gcloud run revisions list --service onference --region asia-northeast3` |
+| 직전 버전으로 되돌리기 | `gcloud run services update-traffic onference --region asia-northeast3 --to-revisions <리비전이름>=100` |
+| 실시간 로그 보기 | `gcloud beta run services logs tail onference --region asia-northeast3` |
+| 서비스 삭제 | `gcloud run services delete onference --region asia-northeast3` |
 
-**삭제**: `gcloud run services delete onference --region asia-northeast3`
+리전을 서울(`asia-northeast3`)이 아닌 곳에 배포했다면 위 명령의 `--region` 값을 바꾼다.
+어디에 있는지 모르면 `gcloud run services list` 로 확인한다.
+
+### 알아둘 점
+
+- **비밀번호만 바꿔도 Firestore 설정은 유지된다.** 스크립트가 이번에 지정하지 않은 기존 환경 변수를
+  읽어서 그대로 이어붙인다(시크릿 참조는 건드리지 않는다).
+- `AUTH_PASS` 에 쉼표·`@`·따옴표가 들어가도 안전하다(환경 변수를 YAML 파일로 전달한다).
+- 빌드는 Cloud Build 에서 돌아간다. 첫 배포만 3~5분이고 이후에는 1~2분이다.
+- Cloud Shell 은 일정 시간 쓰지 않으면 홈 디렉터리를 제외한 상태가 초기화된다. 소스는 `~/onference`
+  에 남아 있으므로 다음에는 `cd ~/onference && git pull` 부터 시작하면 된다.
 
 > 회사 계정으로 로그인한 사람만 접근하게 하려면 Cloud Run 앞에 **IAP(Identity-Aware Proxy)** 를
 > 붙이는 방식이 정석이다. 부하 분산기 설정이 필요하므로, 그 구성이 필요하면 알려 달라.
