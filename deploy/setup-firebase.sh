@@ -44,6 +44,12 @@ fi
 echo "▶ 프로젝트: ${PROJECT_ID} / 리전: ${REGION} / 관리자: ${ADMIN}"
 echo
 
+# 로컬에 설치된 firebase CLI 를 쓴다(없으면 npx 로 내려받음)
+FB() { if [[ -x node_modules/.bin/firebase ]]; then node_modules/.bin/firebase "$@"; else npx --yes firebase-tools@13 "$@"; fi; }
+
+echo "[0/6] 의존성 설치 (처음에는 1~2분 걸립니다)"
+npm ci --silent 2>/dev/null || npm install --silent
+
 echo "[1/6] 필요한 API 활성화"
 gcloud services enable \
   firestore.googleapis.com firebase.googleapis.com identitytoolkit.googleapis.com \
@@ -61,7 +67,7 @@ else
 fi
 
 echo "[3/6] Firebase 연결 및 웹 앱 등록"
-npx --yes firebase-tools@13 projects:addfirebase "${PROJECT_ID}" >/dev/null 2>&1 \
+FB projects:addfirebase "${PROJECT_ID}" >/dev/null 2>&1 \
   && echo "      Firebase 추가 완료" || echo "      이미 Firebase 프로젝트임 — 건너뜀"
 
 # 표 출력은 버전마다 달라지므로 JSON 으로 받아 파싱한다
@@ -79,24 +85,23 @@ pick_app_id() {
     })'
 }
 
-APP_ID="$(npx --yes firebase-tools@13 apps:list WEB --project "${PROJECT_ID}" --json 2>/dev/null | pick_app_id)"
+APP_ID="$(FB apps:list WEB --project "${PROJECT_ID}" --json 2>/dev/null | pick_app_id)"
 if [[ -z "${APP_ID}" ]]; then
   echo "      웹 앱 생성"
-  APP_ID="$(npx --yes firebase-tools@13 apps:create WEB onference --project "${PROJECT_ID}" --json 2>/dev/null | pick_app_id)"
+  APP_ID="$(FB apps:create WEB onference --project "${PROJECT_ID}" --json 2>/dev/null | pick_app_id)"
 fi
 [[ -z "${APP_ID}" ]] && { echo "❌ 웹 앱 ID를 가져오지 못했습니다. Firebase 콘솔에서 웹 앱을 추가한 뒤 다시 실행하세요." >&2; exit 1; }
 
-SDK_JSON="$(npx --yes firebase-tools@13 apps:sdkconfig WEB "${APP_ID}" --project "${PROJECT_ID}" --json 2>/dev/null)"
+SDK_JSON="$(FB apps:sdkconfig WEB "${APP_ID}" --project "${PROJECT_ID}" --json 2>/dev/null)"
 API_KEY="$(node -e "const j=JSON.parse(process.argv[1]); const c=j.result?.sdkConfig??j.sdkConfig??{}; process.stdout.write(c.apiKey??'')" "${SDK_JSON}")"
 AUTH_DOMAIN="$(node -e "const j=JSON.parse(process.argv[1]); const c=j.result?.sdkConfig??j.sdkConfig??{}; process.stdout.write(c.authDomain??'')" "${SDK_JSON}")"
 [[ -z "${API_KEY}" ]] && { echo "❌ API 키를 가져오지 못했습니다." >&2; exit 1; }
 echo "      웹 앱: ${APP_ID}"
 
 echo "[4/6] 역할별 접근 규칙 배포"
-npx --yes firebase-tools@13 deploy --only firestore:rules --project "${PROJECT_ID}" --non-interactive
+FB deploy --only firestore:rules --project "${PROJECT_ID}" --non-interactive
 
 echo "[5/6] 초기 데이터 업로드 및 관리자 초대"
-npm ci --omit=optional --silent 2>/dev/null || npm install --silent
 npm run seed:export --silent
 SEED_ARGS=(--project "${PROJECT_ID}" --admin "${ADMIN}")
 has empty "$@" && SEED_ARGS+=(--empty)

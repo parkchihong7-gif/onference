@@ -11,3 +11,6 @@ deploy/.htpasswd
 # Firebase 프로젝트 지정 파일 — 각자 환경에서 생성
 .firebaserc
 dist-seed
+firestore-debug.log
+firebase-debug.log
+*-debug.log
