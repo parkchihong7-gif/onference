@@ -62,6 +62,9 @@ export class FirebaseBackend implements Backend {
     // 읽기 횟수가 급격히 줄고(= 요금), 새로고침도 즉시 그려진다.
     this.db = initializeFirestore(this.app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      // 값이 비어 있는 선택 필드(전화번호 등)는 저장에서 빼고 넘어간다.
+      // 이 설정이 없으면 undefined 가 하나라도 섞인 순간 쓰기 전체가 거부된다.
+      ignoreUndefinedProperties: true,
     })
     this.auth = getAuth(this.app)
   }
@@ -130,7 +133,8 @@ export class FirebaseBackend implements Backend {
       role: data.role as Member['role'],
       org: data.org ?? '',
       email,
-      phone: data.phone,
+      // 초대장에 전화번호가 없을 수 있으므로 값이 있을 때만 넣는다
+      ...(data.phone ? { phone: data.phone } : {}),
     }
     await setDoc(doc(this.db, 'members', u.uid), member)
     return member
