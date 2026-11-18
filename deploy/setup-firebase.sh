@@ -28,7 +28,10 @@ ADMIN="$(arg admin "$@" || true)"
 PROJECT_ID="$(arg project "$@" || true)"
 REGION="$(arg region "$@" || true)"
 DOMAIN="$(arg domain "$@" || true)"
+# 프로젝트 결정 순서: --project 인자 → gcloud 설정 → Cloud Shell 환경변수
 PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
+[[ -z "${PROJECT_ID}" || "${PROJECT_ID}" == "(unset)" ]] && PROJECT_ID="${DEVSHELL_PROJECT_ID:-}"
+[[ -z "${PROJECT_ID}" ]] && PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-}"
 REGION="${REGION:-asia-northeast3}"
 SERVICE="${SERVICE:-onference}"
 
@@ -37,7 +40,17 @@ if [[ -z "${ADMIN}" ]]; then
   exit 1
 fi
 if [[ -z "${PROJECT_ID}" || "${PROJECT_ID}" == "(unset)" ]]; then
-  echo "❌ 프로젝트를 찾을 수 없습니다.  gcloud config set project <프로젝트ID> 를 먼저 실행하세요." >&2
+  echo "❌ 사용할 GCP 프로젝트가 지정되지 않았습니다." >&2
+  echo >&2
+  echo "   아래 목록에서 프로젝트 ID(PROJECT_ID 열)를 골라 실행하세요:" >&2
+  echo >&2
+  gcloud projects list --format='table(projectId:label=PROJECT_ID, name:label=이름, projectNumber:label=번호)' 2>/dev/null >&2 \
+    || echo "   (프로젝트 목록을 가져오지 못했습니다. 콘솔 상단의 프로젝트 선택기에서 확인하세요.)" >&2
+  echo >&2
+  echo "   gcloud config set project <프로젝트ID>" >&2
+  echo "   bash deploy/setup-firebase.sh --admin ${ADMIN}" >&2
+  echo >&2
+  echo "   또는 한 번에:  bash deploy/setup-firebase.sh --admin ${ADMIN} --project <프로젝트ID>" >&2
   exit 1
 fi
 
