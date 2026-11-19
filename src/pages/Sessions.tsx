@@ -1,16 +1,19 @@
+import type { Session } from '../types'
 import { useApp } from '../store'
 import { activeConference, sessionsOf } from '../lib/metrics'
-import { Badge, Card, StatTile } from '../components/ui'
+import { Badge, Card, StatTile, Modal } from '../components/ui'
 import { flag, fmtDate } from '../lib/format'
 import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { useState } from 'react'
-import { NewSessionDialog } from '../components/Create'
+import { SessionDialog } from '../components/Create'
 
 export function Sessions() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const labels = labelsOf(activeConference(state))
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<Session | undefined>()
+  const [removing, setRemoving] = useState<Session | undefined>()
   const conf = activeConference(state)
   const sessions = sessionsOf(state)
   const days = [...new Set(sessions.map(s => s.date))].sort()
@@ -32,7 +35,25 @@ export function Sessions() {
         </div>
       </div>
 
-      <NewSessionDialog open={adding} onClose={() => setAdding(false)} />
+      <SessionDialog open={adding} onClose={() => setAdding(false)} />
+      <SessionDialog edit={editing} open={!!editing} onClose={() => setEditing(undefined)} />
+      <Modal open={!!removing} onClose={() => setRemoving(undefined)}
+        title="세션 삭제" sub={removing?.title}
+        footer={
+          <>
+            <button className="btn" onClick={() => setRemoving(undefined)}>취소</button>
+            <button className="btn btn-danger" onClick={() => {
+              if (removing) dispatch({ type: 'DELETE_SESSION', id: removing.id })
+              setRemoving(undefined)
+            }}>삭제</button>
+          </>
+        }>
+        <p className="small" style={{ lineHeight: 1.8 }}>
+          <strong>{removing?.title}</strong> 세션을 삭제합니다.
+          {!!removing?.speakerIds.length && <><br />배정된 {labels.speaker} {removing.speakerIds.length}명의 배정이 함께 해제됩니다({labels.speaker} 자체는 남습니다).</>}
+          <br />되돌릴 수 없으며, 모든 담당자 화면에 즉시 반영됩니다.
+        </p>
+      </Modal>
 
       <div className="grid g4">
         <StatTile label="세션" value={sessions.length} unit="개" foot={`${conf.tracks.length}개 트랙 · ${days.length}일`} />
@@ -46,7 +67,7 @@ export function Sessions() {
           sub={`${sessions.filter(s => s.date === day).length}개 세션`}>
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>시간</th><th>세션</th><th>트랙</th><th>유형</th><th>장소</th><th>방식</th><th>{labels.speaker}</th></tr></thead>
+              <thead><tr><th>시간</th><th>세션</th><th>트랙</th><th>유형</th><th>장소</th><th>방식</th><th>{labels.speaker}</th><th className="no-print">관리</th></tr></thead>
               <tbody>
                 {sessions.filter(s => s.date === day).sort((a, b) => a.startTime.localeCompare(b.startTime)).map(s => (
                   <tr key={s.id}>
@@ -66,6 +87,12 @@ export function Sessions() {
                         ) : null
                       })}
                       {!s.speakerIds.length && <span className="muted small">-</span>}
+                    </td>
+                    <td className="no-print nowrap">
+                      <div className="row" style={{ gap: 4 }}>
+                        <button className="btn btn-sm" title="세션 수정" onClick={() => setEditing(s)}>✎</button>
+                        <button className="btn btn-sm" title="세션 삭제" onClick={() => setRemoving(s)}>🗑</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

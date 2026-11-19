@@ -1,5 +1,5 @@
 import { labelsOf } from '../lib/scope'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../store'
 import { Field, Modal } from './ui'
 import { activeConference } from '../lib/metrics'
@@ -9,15 +9,21 @@ import {
 } from '../lib/factory'
 import { addDays } from '../data/base'
 import { today } from '../lib/format'
-import type { ConferenceScope, Industry, SpeakerTier } from '../types'
+import type { Conference, ConferenceScope, Industry, Session, Speaker, SpeakerTier } from '../types'
 
 const INDUSTRIES: Industry[] = ['의료·학회', '학술', '기업', '공공', '협회']
 const TIERS: SpeakerTier[] = ['Keynote', 'Invited', 'Panel', 'Moderator', 'Chair', 'Workshop']
 
 /* ───────────────────────────── 새 행사 ───────────────────────────── */
 
-export function NewConferenceDialog(
-  { open, onClose, fresh = false }: { open: boolean; onClose: () => void; fresh?: boolean },
+/**
+ * 행사 만들기 / 수정하기
+ * edit 이 오면 그 행사의 값으로 채워 열리고, 저장하면 변경분만 반영된다.
+ * 변경은 공유 데이터에 바로 쓰이므로 다른 담당자 화면에도 즉시 적용된다.
+ */
+export function ConferenceDialog(
+  { open, onClose, fresh = false, edit }:
+  { open: boolean; onClose: () => void; fresh?: boolean; edit?: Conference },
 ) {
   const { state, dispatch, reset: resetAll } = useApp()
   const [scope, setScope] = useState<ConferenceScope>('국내')
@@ -40,9 +46,30 @@ export function NewConferenceDialog(
   const [copySessions, setCopySessions] = useState(true)
   const [err, setErr] = useState('')
 
-  const modules = useMemo(() => defaultModules(scope, industry), [scope, industry])
+  // 수정 모드에서는 기존 모듈 구성을 유지한다(성격만 바뀌었다고 모듈을 갈아끼우면 안 된다)
+  const modules = useMemo(
+    () => (edit ? edit.modules : defaultModules(scope, industry)),
+    [edit, scope, industry],
+  )
   // 지금 입력 중인 행사 성격을 따라 용어가 바뀐다(국내 학회 = 연자, 국제 컨퍼런스 = 연사)
   const labels = labelsOf({ scope } as Parameters<typeof labelsOf>[0])
+
+  // 열릴 때마다 대상 행사의 현재 값으로 폼을 맞춘다
+  useEffect(() => {
+    if (!open) return
+    if (edit) {
+      setScope(edit.scope); setIndustry(edit.industry)
+      setNameKo(edit.nameKo); setNameEn(edit.nameEn ?? ''); setCode(edit.code)
+      setStartDate(edit.startDate); setEndDate(edit.endDate)
+      setVenue(edit.venue ?? ''); setCity(edit.city ?? '')
+      setHost(edit.host ?? ''); setPco(edit.pco ?? '')
+      setAttendees(edit.expectedAttendees ?? 0)
+      setBudget(edit.budgetTotalKRW ?? 0); setInviteBudget(edit.invitationBudgetKRW ?? 0)
+      setTracks((edit.tracks ?? []).join(', '))
+      setCreditAuthority(edit.creditAuthority ?? '')
+    }
+    setErr('')
+  }, [open, edit])
 
   const reset = () => {
     setNameKo(''); setNameEn(''); setCode(''); setVenue(''); setHost(''); setPco('')
@@ -52,13 +79,31 @@ export function NewConferenceDialog(
   const submit = () => {
     if (!nameKo.trim()) { setErr('행사명을 입력하세요.'); return }
     if (!startDate) { setErr('개막일을 입력하세요.'); return }
+    const trackList = tracks.split(',').map(t => t.trim()).filter(Boolean)
+
+    if (edit) {
+      dispatch({
+        type: 'PATCH_CONFERENCE', id: edit.id,
+        patch: {
+          scope, industry, nameKo, nameEn, code: code || edit.code,
+          startDate, endDate: endDate || startDate,
+          venue, city, host, organizer: host || edit.organizer, pco,
+          expectedAttendees: attendees,
+          budgetTotalKRW: budget, invitationBudgetKRW: inviteBudget,
+          tracks: trackList,
+          creditAuthority: creditAuthority || undefined,
+        },
+      })
+      onClose()
+      return
+    }
     const input: NewConferenceInput = {
       nameKo, nameEn, code: code || nameKo.replace(/\s/g, '').slice(0, 10),
       scope, industry, startDate, endDate: endDate || startDate,
       venue, city, host, organizer: host, pco,
       expectedAttendees: attendees,
       budgetTotalKRW: budget, invitationBudgetKRW: inviteBudget,
-      tracks: tracks.split(',').map(t => t.trim()).filter(Boolean),
+      tracks: trackList,
       creditAuthority: modules.includes('연수평점') ? creditAuthority : undefined,
       modules,
       copyFrom: copyFrom || undefined,
@@ -76,14 +121,16 @@ export function NewConferenceDialog(
 
   return (
     <Modal open={open} onClose={onClose} wide
-      title={fresh ? '전체 비우고 새 행사 시작' : '새 행사 만들기'}
-      sub={fresh
-        ? '데모 데이터를 모두 지우고 이 행사만 남깁니다 (멤버·템플릿은 유지)'
-        : '행사 성격에 맞는 모듈과 업무 체크리스트가 자동으로 생성됩니다'}
+      title={edit ? '행사 정보 수정' : fresh ? '전체 비우고 새 행사 시작' : '새 행사 만들기'}
+      sub={edit
+        ? '저장하면 모든 담당자 화면에 즉시 반영됩니다'
+        : fresh
+          ? '데모 데이터를 모두 지우고 이 행사만 남깁니다 (멤버·템플릿은 유지)'
+          : '행사 성격에 맞는 모듈과 업무 체크리스트가 자동으로 생성됩니다'}
       footer={
         <>
           <button className="btn" onClick={onClose}>취소</button>
-          <button className="btn btn-primary" onClick={submit}>{fresh ? '전체 비우고 시작' : '행사 만들기'}</button>
+          <button className="btn btn-primary" onClick={submit}>{edit ? '저장' : fresh ? '전체 비우고 시작' : '행사 만들기'}</button>
         </>
       }>
       {err && <div className="alert alert-critical" style={{ marginBottom: 12 }}><span aria-hidden>⛔</span><span>{err}</span></div>}
@@ -152,13 +199,13 @@ export function NewConferenceDialog(
           </Field>
         )}
 
-        {!fresh && <Field label="기존 행사 구성 가져오기" span hint="매년 열리는 행사라면 지난 회차를 고르면 세션 구성을 그대로 복사합니다">
+        {!fresh && !edit && <Field label="기존 행사 구성 가져오기" span hint="매년 열리는 행사라면 지난 회차를 고르면 세션 구성을 그대로 복사합니다">
           <select className="select" value={copyFrom} onChange={e => setCopyFrom(e.target.value)}>
             <option value="">가져오지 않음 (빈 상태로 시작)</option>
             {state.conferences.map(c => <option key={c.id} value={c.id}>{c.nameKo}</option>)}
           </select>
         </Field>}
-        {!fresh && copyFrom && (
+        {!fresh && !edit && copyFrom && (
           <label className="row small" style={{ gap: 8, gridColumn: '1 / -1' }}>
             <input type="checkbox" checked={copySessions} onChange={e => setCopySessions(e.target.checked)} />
             세션 구성 복사 (날짜는 새 일정으로 자동 조정 · {labels.speaker} 배정은 비웁니다)
@@ -170,7 +217,9 @@ export function NewConferenceDialog(
         <span aria-hidden>ℹ</span>
         <span>
           활성 모듈: {modules.join(' · ')}
-          <br />개막일 기준으로 마일스톤과 업무 체크리스트가 자동 생성되며, 모듈 구성은 나중에 바꿀 수 있습니다.
+          <br />{edit
+            ? '모듈 구성은 아래 「모듈 구성」에서 켜고 끌 수 있습니다. 날짜를 바꿔도 이미 만들어진 업무 기한은 자동으로 옮겨지지 않습니다.'
+            : '개막일 기준으로 마일스톤과 업무 체크리스트가 자동 생성되며, 모듈 구성은 나중에 바꿀 수 있습니다.'}
         </span>
       </div>
     </Modal>
@@ -179,7 +228,14 @@ export function NewConferenceDialog(
 
 /* ───────────────────────────── 새 연자 ───────────────────────────── */
 
-export function NewSpeakerDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * 연자 등록 / 수정
+ * edit 이 오면 그 연자의 값으로 채워 열리고, 저장하면 변경분만 반영된다.
+ * (제출물·업무는 등록 시 한 번 생성되며, 수정으로는 다시 만들지 않는다)
+ */
+export function SpeakerDialog(
+  { open, onClose, edit }: { open: boolean; onClose: () => void; edit?: Speaker },
+) {
   const { state, dispatch } = useApp()
   const conf = activeConference(state)
   const labels = labelsOf(conf)
@@ -202,9 +258,40 @@ export function NewSpeakerDialog({ open, onClose }: { open: boolean; onClose: ()
   const [memo, setMemo] = useState('')
   const [err, setErr] = useState('')
 
+  useEffect(() => {
+    if (!open) return
+    if (edit) {
+      setResidency(edit.residency); setNameKo(edit.nameKo ?? ''); setNameEn(edit.nameEn ?? '')
+      setTitle(edit.title ?? ''); setAffiliation(edit.affiliation ?? ''); setDepartment(edit.department ?? '')
+      setCountry(edit.country ?? ''); setEmail(edit.email ?? ''); setPhone(edit.phone ?? '')
+      setTier(edit.tier); setLiaison(edit.liaisonMemberId ?? '')
+      setPkg(edit.supportPackageId ?? '')
+      setHonorarium(edit.settlement?.honorarium ?? 0)
+      setSessionIds(edit.sessionIds ?? [])
+      setMemo(edit.memo ?? '')
+    }
+    setErr('')
+  }, [open, edit])
+
   const submit = () => {
     if (!nameKo.trim() && !nameEn.trim()) { setErr('성명을 입력하세요.'); return }
     if (!affiliation.trim()) { setErr('소속을 입력하세요.'); return }
+
+    if (edit) {
+      dispatch({
+        type: 'PATCH_SPEAKER', id: edit.id,
+        patch: {
+          nameKo: nameKo || nameEn, nameEn, title, affiliation, department,
+          residency, country, email, phone, tier,
+          liaisonMemberId: liaison, supportPackageId: pkg,
+          sessionIds, memo,
+          settlement: { ...edit.settlement, honorarium },
+        },
+        audit: { memo: '정보 수정' },
+      })
+      onClose()
+      return
+    }
     const input: NewSpeakerInput = {
       nameKo: nameKo || nameEn, nameEn, title, affiliation, department,
       residency, country, email, phone, tier,
@@ -220,12 +307,14 @@ export function NewSpeakerDialog({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <Modal open={open} onClose={onClose} wide
-      title={`${labels.speaker} 추가`}
-      sub="등록하면 제출물 목록과 업무 체크리스트가 함께 생성됩니다"
+      title={`${labels.speaker} ${edit ? '정보 수정' : '추가'}`}
+      sub={edit
+        ? '저장하면 모든 담당자 화면에 즉시 반영됩니다'
+        : '등록하면 제출물 목록과 업무 체크리스트가 함께 생성됩니다'}
       footer={
         <>
           <button className="btn" onClick={onClose}>취소</button>
-          <button className="btn btn-primary" onClick={submit}>등록</button>
+          <button className="btn btn-primary" onClick={submit}>{edit ? '저장' : '등록'}</button>
         </>
       }>
       {err && <div className="alert alert-critical" style={{ marginBottom: 12 }}><span aria-hidden>⛔</span><span>{err}</span></div>}
@@ -298,7 +387,10 @@ export function NewSpeakerDialog({ open, onClose }: { open: boolean; onClose: ()
 
 /* ───────────────────────────── 새 세션 ───────────────────────────── */
 
-export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** 세션 추가 / 수정 — edit 이 오면 그 세션의 값으로 채워 열린다 */
+export function SessionDialog(
+  { open, onClose, edit }: { open: boolean; onClose: () => void; edit?: Session },
+) {
   const { state, dispatch } = useApp()
   const conf = activeConference(state)
   const [form, setForm] = useState<NewSessionInput>({
@@ -310,8 +402,29 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
   const set = <K extends keyof NewSessionInput>(k: K, v: NewSessionInput[K]) => setForm(f => ({ ...f, [k]: v }))
   const [err, setErr] = useState('')
 
+  useEffect(() => {
+    if (!open) return
+    if (edit) {
+      setForm({
+        title: edit.title, type: edit.type, track: edit.track ?? '',
+        date: edit.date, startTime: edit.startTime, endTime: edit.endTime,
+        room: edit.room ?? '', mode: edit.mode, language: edit.language ?? 'KO',
+        interpretation: !!edit.interpretation, recorded: !!edit.recorded,
+      })
+    }
+    setErr('')
+  }, [open, edit])
+
   const submit = () => {
     if (!form.title.trim()) { setErr('세션명을 입력하세요.'); return }
+    if (form.endTime <= form.startTime) { setErr('종료 시각이 시작 시각보다 빠릅니다.'); return }
+    if (form.date < conf.startDate || form.date > conf.endDate) {
+      setErr(`세션 일자는 행사 기간(${conf.startDate} ~ ${conf.endDate}) 안이어야 합니다.`); return
+    }
+    if (edit) {
+      dispatch({ type: 'PATCH_SESSION', id: edit.id, patch: { ...form } })
+      setErr(''); onClose(); return
+    }
     dispatch({ type: 'ADD_SESSION', session: createSession(conf, form) })
     setForm(f => ({ ...f, title: '', room: '' })); setErr('')
     onClose()
@@ -319,12 +432,12 @@ export function NewSessionDialog({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <Modal open={open} onClose={onClose}
-      title="세션 추가"
+      title={edit ? '세션 수정' : '세션 추가'}
       sub={`${conf.nameKo} · ${conf.startDate} ~ ${conf.endDate}`}
       footer={
         <>
           <button className="btn" onClick={onClose}>취소</button>
-          <button className="btn btn-primary" onClick={submit}>추가</button>
+          <button className="btn btn-primary" onClick={submit}>{edit ? '저장' : '추가'}</button>
         </>
       }>
       {err && <div className="alert alert-critical" style={{ marginBottom: 12 }}><span aria-hidden>⛔</span><span>{err}</span></div>}

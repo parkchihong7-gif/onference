@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp, useEnsure } from '../store'
+import { SpeakerDialog } from '../components/Create'
 import { activeConference, computeRisks, readiness } from '../lib/metrics'
 import { Avatar, Badge, Card, DL, Empty, StatusBadge, TierTag } from '../components/ui'
 import { daysBetween, ddayLabel, flag, fmtDate, fmtDateTime, krw, money, today, toneOf } from '../lib/format'
@@ -17,6 +18,7 @@ export function SpeakerDetail({ id }: { id: string }) {
   const { state, dispatch } = useApp()
   const labels = labelsOf(activeConference(state))
   useEnsure(['communications', 'auditLogs'])
+  const [editing, setEditing] = useState(false)
   const [tab, setTab] = useState('개요')
   const sp = state.speakers.find(s => s.id === id)
   const conf = activeConference(state)
@@ -35,6 +37,7 @@ export function SpeakerDetail({ id }: { id: string }) {
 
   return (
     <>
+      <SpeakerDialog edit={sp} open={editing} onClose={() => setEditing(false)} />
       <div className="page-head">
         <div className="row" style={{ gap: 14, alignItems: 'flex-start' }}>
           <Avatar name={displayName(sp)} size="lg" />
@@ -54,6 +57,7 @@ export function SpeakerDetail({ id }: { id: string }) {
         </div>
         <div className="row-wrap no-print">
           <button className="btn" onClick={() => go('speakers')}>← 목록</button>
+          <button className="btn" onClick={() => setEditing(true)}>✎ 정보 수정</button>
           {CAN_PRINT && <button className="btn" onClick={() => window.print()}>🖨 개인 일정표 인쇄</button>}
           <select className="select" value={sp.stage}
             onChange={e => dispatch({ type: 'SET_STAGE', id: sp.id, stage: e.target.value as PipelineStage })}>

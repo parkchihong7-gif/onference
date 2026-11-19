@@ -6,7 +6,7 @@ import { ddayLabel, flag, fmtDate, krwShort, today } from '../lib/format'
 import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
-import { NewSpeakerDialog } from '../components/Create'
+import { SpeakerDialog } from '../components/Create'
 import type { PipelineStage } from '../types'
 
 const COLUMNS: PipelineStage[] = [...PIPELINE_ORDER, '거절']
@@ -39,7 +39,7 @@ export function Pipeline() {
         </div>
       </div>
 
-      <NewSpeakerDialog open={adding} onClose={() => setAdding(false)} />
+      <SpeakerDialog open={adding} onClose={() => setAdding(false)} />
 
       <div className="kanban">
         {COLUMNS.map(col => {

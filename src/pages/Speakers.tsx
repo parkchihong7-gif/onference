@@ -1,18 +1,18 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../store'
 import { activeConference, readiness, speakersOf } from '../lib/metrics'
-import { Badge, Card, StatusBadge, TierTag } from '../components/ui'
+import { Badge, Card, StatusBadge, TierTag, Modal } from '../components/ui'
 import { flag, fmtDate, krwShort, toneOf } from '../lib/format'
 import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { downloadCsv } from '../lib/csv'
-import { NewSpeakerDialog } from '../components/Create'
+import { SpeakerDialog } from '../components/Create'
 import type { Speaker } from '../types'
 
 const STAGES = ['전체', '후보발굴', '내부승인', '사전타진', '공식초청', '수락', '계약완료', '거절'] as const
 
 export function Speakers() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const conf = activeConference(state)
   const labels = labelsOf(conf)
   const all = speakersOf(state)
@@ -22,6 +22,8 @@ export function Speakers() {
   const [liaison, setLiaison] = useState('전체')
   const [visaOnly, setVisaOnly] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<Speaker | undefined>()
+  const [removing, setRemoving] = useState<Speaker | undefined>()
 
   const rows = useMemo(() => all.filter(s => {
     if (stage !== '전체' && s.stage !== stage) return false
@@ -53,7 +55,14 @@ export function Speakers() {
 
   return (
     <>
-      <NewSpeakerDialog open={adding} onClose={() => setAdding(false)} />
+      <SpeakerDialog open={adding} onClose={() => setAdding(false)} />
+      <SpeakerDialog edit={editing} open={!!editing} onClose={() => setEditing(undefined)} />
+      <ConfirmDelete
+        target={removing}
+        onCancel={() => setRemoving(undefined)}
+        onConfirm={() => { if (removing) dispatch({ type: 'DELETE_SPEAKER', id: removing.id }); setRemoving(undefined) }}
+        taskCount={removing ? state.tasks.filter(t => t.speakerId === removing.id).length : 0}
+        label={labels.speaker} />
       <div className="page-head">
         <div>
           <h1 className="page-title">{labels.speaker}·초청자 관리</h1>
@@ -94,12 +103,18 @@ export function Speakers() {
             <thead>
               <tr>
                 <th>{labels.speaker}</th><th>등급</th><th>단계</th><th>참석</th><th>지원</th><th>담당</th>
-                <th>입국/비자</th><th>항공·숙박</th><th>제출물</th><th>준비도</th><th className="right">강연료</th><th>수정</th>
+                <th>입국/비자</th><th>항공·숙박</th><th>제출물</th><th>준비도</th><th className="right">{labels.honorarium}</th>
+                <th>최근 수정</th><th className="no-print">관리</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(s => <Row key={s.id} s={s} liaisonName={state.members.find(m => m.id === s.liaisonMemberId)?.name ?? '-'} />)}
-              {!rows.length && <tr><td colSpan={11} className="empty">조건에 맞는 {labels.speaker}가 없습니다.</td></tr>}
+              {rows.map(s => (
+                <Row key={s.id} s={s}
+                  liaisonName={state.members.find(m => m.id === s.liaisonMemberId)?.name ?? '-'}
+                  onEdit={() => setEditing(s)}
+                  onDelete={() => setRemoving(s)} />
+              ))}
+              {!rows.length && <tr><td colSpan={12} className="empty">조건에 맞는 {labels.speaker}가 없습니다.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -108,7 +123,9 @@ export function Speakers() {
   )
 }
 
-function Row({ s, liaisonName }: { s: Speaker; liaisonName: string }) {
+function Row({ s, liaisonName, onEdit, onDelete }: {
+  s: Speaker; liaisonName: string; onEdit: () => void; onDelete: () => void
+}) {
   const r = readiness(s)
   const docs = s.deliverables.filter(d => d.status === '검수완료').length
   const confirmed = ['수락', '계약완료'].includes(s.stage)
@@ -151,6 +168,37 @@ function Row({ s, liaisonName }: { s: Speaker; liaisonName: string }) {
       </td>
       <td className="right num nowrap">{krwShort(s.settlement.honorarium)}</td>
       <td className="xsmall muted nowrap">{fmtDate(s.updatedAt)}</td>
+      <td className="no-print nowrap">
+        {/* 행 클릭(상세 이동)과 겹치지 않도록 버블링을 막는다 */}
+        <div className="row" style={{ gap: 4 }} onClick={e => e.stopPropagation()}>
+          <button className="btn btn-sm" title="정보 수정" onClick={onEdit}>✎</button>
+          <button className="btn btn-sm" title="삭제" onClick={onDelete}>🗑</button>
+        </div>
+      </td>
     </tr>
+  )
+}
+
+
+/** 삭제는 되돌릴 수 없으므로 무엇이 함께 지워지는지 먼저 알린다 */
+function ConfirmDelete({ target, onCancel, onConfirm, taskCount, label }: {
+  target?: Speaker; onCancel: () => void; onConfirm: () => void; taskCount: number; label: string
+}) {
+  return (
+    <Modal open={!!target} onClose={onCancel}
+      title={`${label} 삭제`}
+      sub={target ? displayName(target) : ''}
+      footer={
+        <>
+          <button className="btn" onClick={onCancel}>취소</button>
+          <button className="btn btn-danger" onClick={onConfirm}>삭제</button>
+        </>
+      }>
+      <p className="small" style={{ lineHeight: 1.8 }}>
+        <strong>{target ? displayName(target) : ''}</strong> ({target?.affiliation}) 을(를) 삭제합니다.
+        {taskCount > 0 && <><br />연결된 업무 <strong>{taskCount}건</strong>도 함께 삭제됩니다.</>}
+        <br />이 작업은 되돌릴 수 없으며, 모든 담당자 화면에 즉시 반영됩니다.
+      </p>
+    </Modal>
   )
 }

@@ -14,7 +14,8 @@ import { hasSharedBackend, loadConfig } from './config'
 export type Action =
   | { type: 'SET_CONFERENCE'; id: string }
   | { type: 'SET_USER'; id: string }
-  | { type: 'PATCH_SPEAKER'; id: string; patch: Partial<Speaker>; audit?: { field: string; before?: string; after?: string; memo?: string } }
+  // audit.field 를 생략하면 바뀐 항목을 자동으로 찾아 이력에 남긴다
+  | { type: 'PATCH_SPEAKER'; id: string; patch: Partial<Speaker>; audit?: { field?: string; before?: string; after?: string; memo?: string } }
   | { type: 'SET_STAGE'; id: string; stage: PipelineStage }
   | { type: 'SET_VISA_STAGE'; id: string; stage: VisaStage }
   | { type: 'PATCH_DELIVERABLE'; speakerId: string; deliverableId: string; patch: Partial<Deliverable> }
@@ -34,7 +35,9 @@ export type Action =
   | { type: 'PATCH_CONFERENCE'; id: string; patch: Partial<Conference> }
   | { type: 'ADD_SPEAKER'; speaker: Speaker; tasks: Task[] }
   | { type: 'ADD_SESSION'; session: Session }
+  | { type: 'PATCH_SESSION'; id: string; patch: Partial<Session> }
   | { type: 'DELETE_SESSION'; id: string }
+  | { type: 'DELETE_SPEAKER'; id: string }
   | { type: 'TOGGLE_MODULE'; conferenceId: string; module: ModuleKey }
   | { type: 'RESET' }
 

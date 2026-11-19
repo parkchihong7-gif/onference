@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../store'
 import type { Invite } from '../data/backend'
-import { NewConferenceDialog } from '../components/Create'
+import { ConferenceDialog } from '../components/Create'
 import { activeConference } from '../lib/metrics'
 import { Badge, Card, DL, StatTile } from '../components/ui'
 import { CORE_MODULES, DOMESTIC_MODULES, OVERSEAS_MODULES } from '../types'
@@ -22,6 +22,7 @@ export function Settings() {
   const [msg, setMsg] = useState('')
   const [newConf, setNewConf] = useState(false)
   const [freshConf, setFreshConf] = useState(false)
+  const [editConf, setEditConf] = useState(false)
   const canInvite = invites.supported && status.user?.role === '사무국'
 
   useEffect(() => {
@@ -90,8 +91,9 @@ export function Settings() {
         <StatTile label="구성원" value={state.members.length} unit="명" foot={`${new Set(state.members.map(m => m.role)).size}개 역할`} />
       </div>
 
-      <NewConferenceDialog open={newConf} onClose={() => setNewConf(false)} />
-      <NewConferenceDialog fresh open={freshConf} onClose={() => setFreshConf(false)} />
+      <ConferenceDialog open={newConf} onClose={() => setNewConf(false)} />
+      <ConferenceDialog fresh open={freshConf} onClose={() => setFreshConf(false)} />
+      <ConferenceDialog edit={conf} open={editConf} onClose={() => setEditConf(false)} />
 
       <Card title="데이터 저장 방식"
         sub={status.mode === '공유' ? '여러 담당자가 같은 데이터를 실시간으로 함께 봅니다' : '이 브라우저에만 저장됩니다'}>
@@ -202,7 +204,8 @@ export function Settings() {
       </Card>
 
       <div className="grid g2">
-        <Card title="행사 기본 정보">
+        <Card title="행사 기본 정보"
+          right={<button className="btn btn-sm no-print" onClick={() => setEditConf(true)}>✎ 수정</button>}>
           <DL items={[
             ['행사 성격', <><Badge tone={conf.scope === '국내' ? 'info' : 'neutral'}>{conf.scope}</Badge> <span className="chip">{conf.industry}</span></>],
             ['행사명(국문)', conf.nameKo], ['행사명(영문)', conf.nameEn], ['코드', conf.code],

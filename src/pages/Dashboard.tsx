@@ -7,7 +7,7 @@ import { addDays } from '../data/seed'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 import { useState } from 'react'
-import { NewSpeakerDialog, NewSessionDialog, NewConferenceDialog } from '../components/Create'
+import { SpeakerDialog, SessionDialog, ConferenceDialog } from '../components/Create'
 
 export function Dashboard() {
   const { state } = useApp()
@@ -91,9 +91,9 @@ export function Dashboard() {
   if (list.length === 0) {
     return (
       <>
-        <NewSpeakerDialog open={addSpeaker} onClose={() => setAddSpeaker(false)} />
-        <NewSessionDialog open={addSession} onClose={() => setAddSession(false)} />
-        <NewConferenceDialog open={addConf} onClose={() => setAddConf(false)} />
+        <SpeakerDialog open={addSpeaker} onClose={() => setAddSpeaker(false)} />
+        <SessionDialog open={addSession} onClose={() => setAddSession(false)} />
+        <ConferenceDialog open={addConf} onClose={() => setAddConf(false)} />
         <div className="page-head">
           <div>
             <h1 className="page-title">{conf.nameKo}</h1>
@@ -161,7 +161,7 @@ export function Dashboard() {
 
   return (
     <>
-      <NewSpeakerDialog open={addSpeaker} onClose={() => setAddSpeaker(false)} />
+      <SpeakerDialog open={addSpeaker} onClose={() => setAddSpeaker(false)} />
       <div className="page-head">
         <div>
           <h1 className="page-title">{conf.nameKo}</h1>

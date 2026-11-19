@@ -450,3 +450,7 @@ table.data tr.clickable { cursor: pointer; }
 .start-step strong { display: block; font-size: 13px; margin-bottom: 2px; }
 .start-step .small { margin: 0 0 8px; }
 .start-num { flex: none; width: 24px; height: 24px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+
+/* 되돌릴 수 없는 동작 */
+.btn-danger { background: var(--critical); border-color: var(--critical); color: #fff; }
+.btn-danger:hover { filter: brightness(0.93); }

@@ -30,6 +30,31 @@ export type Mutation =
   | { kind: 'patch'; col: CollectionKey; id: string; data: Record<string, unknown> }
   | { kind: 'delete'; col: CollectionKey; id: string }
 
+/** 이력에 넣기 좋은 짧은 문자열로 바꾼다(객체·배열은 요약) */
+const brief = (v: unknown): string => {
+  if (v === undefined || v === null || v === '') return '-'
+  if (Array.isArray(v)) return v.length ? `${v.length}건` : '없음'
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    return 'honorarium' in o ? String(o.honorarium) : '변경'
+  }
+  return String(v)
+}
+
+const SPEAKER_FIELD: Record<string, string> = {
+  nameKo: '성명', nameEn: '영문명', title: '직위', affiliation: '소속', department: '부서',
+  residency: '구분', country: '국가', email: '이메일', phone: '연락처', tier: '등급',
+  liaisonMemberId: '담당 리에종', supportPackageId: '지원 패키지', sessionIds: '배정 세션',
+  memo: '메모', settlement: '사례비', attendance: '참석 상태', attendanceMode: '참석 방식',
+}
+
+/** 변경 이력에 한글 항목명으로 남기기 위한 대응표 */
+const SESSION_FIELD: Record<string, string> = {
+  title: '세션명', type: '유형', track: '트랙', date: '일자', startTime: '시작', endTime: '종료',
+  room: '장소', mode: '진행 방식', language: '언어', interpretation: '동시통역', recorded: '녹화·중계',
+  speakerIds: '배정 연자', moderatorId: '좌장',
+}
+
 const rid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`
 const nowStamp = () => new Date().toISOString().slice(0, 16)
 
@@ -60,7 +85,18 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
         data: { ...action.patch, updatedAt: today() } as Record<string, unknown>,
       }]
       if (action.audit) {
-        muts.push(auditMut(actor, { action: '수정', entityType: '연사', entityId: sp.id, entityLabel: label(sp), ...action.audit }))
+        // 어떤 항목이 어떻게 바뀌었는지 남긴다(호출부가 직접 지정하면 그 값을 우선한다)
+        const changed = Object.entries(action.patch)
+          .filter(([k, v]) => JSON.stringify((sp as unknown as Record<string, unknown>)[k]) !== JSON.stringify(v))
+        const auto = changed.length ? {
+          field: changed.map(([k]) => SPEAKER_FIELD[k] ?? k).join(', '),
+          before: changed.map(([k]) => brief((sp as unknown as Record<string, unknown>)[k])).join(' / '),
+          after: changed.map(([, v]) => brief(v)).join(' / '),
+        } : {}
+        muts.push(auditMut(actor, {
+          action: '수정', entityType: '연사', entityId: sp.id, entityLabel: label(sp),
+          ...auto, ...Object.fromEntries(Object.entries(action.audit).filter(([, v]) => v !== undefined)),
+        }))
       }
       return muts
     }
@@ -224,6 +260,39 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
         { kind: 'set', col: 'sessions', id: action.session.id, data: action.session as unknown as Record<string, unknown> },
         auditMut(actor, { action: '생성', entityType: '세션', entityId: action.session.id, entityLabel: action.session.title, field: '세션 등록', after: `${action.session.date} ${action.session.startTime}` }),
       ]
+
+    case 'PATCH_SESSION': {
+      const ses = state.sessions.find(x => x.id === action.id)
+      if (!ses) return []
+      // 바뀐 항목만 이력에 남긴다(값이 같은 필드는 기록하지 않는다)
+      const changed = Object.entries(action.patch)
+        .filter(([k, v]) => JSON.stringify((ses as unknown as Record<string, unknown>)[k]) !== JSON.stringify(v))
+      if (!changed.length) return []
+      return [
+        { kind: 'patch', col: 'sessions', id: action.id, data: action.patch as Record<string, unknown> },
+        auditMut(actor, {
+          action: '수정', entityType: '세션', entityId: ses.id, entityLabel: action.patch.title ?? ses.title,
+          field: changed.map(([k]) => SESSION_FIELD[k] ?? k).join(', '),
+          before: changed.map(([k]) => String((ses as unknown as Record<string, unknown>)[k] ?? '')).join(' / '),
+          after: changed.map(([, v]) => String(v ?? '')).join(' / '),
+        }),
+      ]
+    }
+
+    case 'DELETE_SPEAKER': {
+      const sp = state.speakers.find(x => x.id === action.id)
+      if (!sp) return []
+      const tasks = state.tasks.filter(t => t.speakerId === action.id)
+      return [
+        { kind: 'delete', col: 'speakers', id: sp.id },
+        // 담당 업무도 함께 지운다(남겨두면 어느 화면에서도 접근할 수 없는 고아 레코드가 된다)
+        ...tasks.map(t => ({ kind: 'delete' as const, col: 'tasks' as const, id: t.id })),
+        auditMut(actor, {
+          action: '삭제', entityType: '연사', entityId: sp.id, entityLabel: sp.nameKo || sp.nameEn,
+          field: '연자 삭제', memo: tasks.length ? `연결된 업무 ${tasks.length}건 함께 삭제` : undefined,
+        }),
+      ]
+    }
 
     case 'DELETE_SESSION': {
       const ses = state.sessions.find(x => x.id === action.id)

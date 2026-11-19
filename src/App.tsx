@@ -6,7 +6,7 @@ import { hasModule, labelsOf, needsOverseasModules, overseasSpeakers } from './l
 import { ddayLabel, today } from './lib/format'
 import { Search } from './components/Search'
 import { AuthGate } from './components/AuthGate'
-import { NewConferenceDialog } from './components/Create'
+import { ConferenceDialog } from './components/Create'
 import { Screen } from './components/AuthGate'
 import { Dashboard } from './pages/Dashboard'
 import { Pipeline } from './pages/Pipeline'
@@ -90,7 +90,7 @@ function NoConference({ connected }: { connected: boolean }) {
   }
   return (
     <>
-      <NewConferenceDialog open={newConf} onClose={() => setNewConf(false)} />
+      <ConferenceDialog open={newConf} onClose={() => setNewConf(false)} />
       <Screen
         title="아직 등록된 행사가 없습니다"
         sub="첫 행사를 만들면 바로 시작할 수 있습니다"
@@ -255,7 +255,7 @@ function AppShell() {
       </div>
 
       <Search open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <NewConferenceDialog open={newConfOpen} onClose={() => setNewConfOpen(false)} />
+      <ConferenceDialog open={newConfOpen} onClose={() => setNewConfOpen(false)} />
     </div>
   )
 }
