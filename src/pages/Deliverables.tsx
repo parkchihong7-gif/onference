@@ -9,6 +9,11 @@ import { downloadCsv } from '../lib/csv'
 import type { DeliverableStatus } from '../types'
 
 /** 매트릭스 헤더용 축약 라벨 */
+/**
+ * 세로 머리글용 짧은 이름.
+ * 빠진 항목이 있으면 원문이 그대로 들어가 머리글 높이를 넘어 표가 깨지므로,
+ * DeliverableType 전부를 여기서 덮는다.
+ */
 const SHORT: Record<string, string> = {
   '강연동의서(Speaker Agreement)': '강연동의서',
   '개인정보 처리 동의(GDPR)': 'GDPR 동의',
@@ -19,6 +24,12 @@ const SHORT: Record<string, string> = {
   '약력(Bio)': '약력',
   '녹화·중계 동의서': '녹화동의서',
   '여행자보험 정보': '보험정보',
+  '사례비 지급정보(통장·신분증)': '지급정보',
+  '이해관계 선언(COI)': 'COI 선언',
+  '강의계획서': '강의계획서',
+  '항공선호정보': '항공선호',
+  '여권사본': '여권사본',
+  '증명사진': '증명사진',
 }
 
 const CELL: Record<DeliverableStatus, { bg: string; mark: string; tone: string }> = {
@@ -100,10 +111,7 @@ export function Deliverables() {
               <tr>
                 <th style={{ minWidth: 190 }}>{labels.speaker}</th>
                 {types.map(t => (
-                  <th key={t} className="xsmall" title={t}
-                    style={{ writingMode: 'vertical-rl', height: 116, padding: '8px 3px', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                    {SHORT[t] ?? t}
-                  </th>
+                  <th key={t} className="xsmall matrix-head" title={t}>{SHORT[t] ?? t}</th>
                 ))}
                 <th className="right">완료율</th>
               </tr>

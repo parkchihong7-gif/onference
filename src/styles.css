@@ -454,3 +454,18 @@ table.data tr.clickable { cursor: pointer; }
 /* 되돌릴 수 없는 동작 */
 .btn-danger { background: var(--critical); border-color: var(--critical); color: #fff; }
 .btn-danger:hover { filter: brightness(0.93); }
+
+/* 제출물 매트릭스 머리글
+   항목명이 짧아 가로로 두고 줄만 바꾼다. 세로쓰기는 높이 제약이 표 레이아웃에
+   먹히지 않아 글자가 잘리거나 아래 행을 침범했다. */
+.matrix-head {
+  width: 74px;
+  min-width: 74px;
+  padding: 10px 4px;
+  font-weight: 600;
+  vertical-align: bottom;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.3;
+}
