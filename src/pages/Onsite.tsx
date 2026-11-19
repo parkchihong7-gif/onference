@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../store'
+import { OnsiteDialog } from '../components/OpsEdit'
 import { activeConference, sessionsOf, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatTile } from '../components/ui'
 import { flag, fmtDate, fmtDateTime } from '../lib/format'
@@ -19,6 +20,7 @@ const STEPS: { key: Step; label: string }[] = [
 
 export function Onsite() {
   const { state, dispatch } = useApp()
+  const [onsiteFor, setOnsiteFor] = useState<Speaker | undefined>()
   const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const sessions = sessionsOf(state)
@@ -40,6 +42,8 @@ export function Onsite() {
 
   return (
     <>
+
+    {onsiteFor && <OnsiteDialog open onClose={() => setOnsiteFor(undefined)} speaker={onsiteFor} />}
       <div className="page-head">
         <div>
           <h1 className="page-title">현장 운영</h1>
@@ -62,7 +66,7 @@ export function Onsite() {
         <div className="table-wrap">
           <table className="data">
             <thead>
-              <tr><th>{labels.speaker}</th><th>등급</th><th>세션</th><th>숙소</th>{STEPS.map(s => <th key={s.key}>{s.label}</th>)}<th>배지</th></tr>
+              <tr><th>{labels.speaker}</th><th>등급</th><th>세션</th><th>숙소</th>{STEPS.map(s => <th key={s.key}>{s.label}</th>)}<th>배지</th><th className="no-print">수정</th></tr>
             </thead>
             <tbody>
               {onsiteList.map(s => (
@@ -86,6 +90,9 @@ export function Onsite() {
                       onClick={() => dispatch({ type: 'PATCH_SPEAKER', id: s.id, patch: { onsite: { ...s.onsite, badgeIssued: !s.onsite.badgeIssued } }, audit: { field: '배지 발급', before: String(s.onsite.badgeIssued), after: String(!s.onsite.badgeIssued) } })}>
                       {s.onsite.badgeIssued ? '발급' : '미발급'}
                     </button>
+                  </td>
+                  <td className="no-print">
+                    <button className="btn btn-sm" title="현장 진행 수정" onClick={() => setOnsiteFor(s)}>✎</button>
                   </td>
                 </tr>
               ))}

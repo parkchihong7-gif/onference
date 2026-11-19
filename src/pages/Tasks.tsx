@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../store'
+import { TaskDialog } from '../components/OpsEdit'
+import type { Task } from '../types'
 import { activeConference, tasksOf } from '../lib/metrics'
 import { Badge, Card, StatTile, StatusBadge } from '../components/ui'
 import { ddayLabel, flag, fmtDate, today } from '../lib/format'
@@ -19,6 +21,8 @@ export function TasksPage() {
   const [owner, setOwner] = useState('전체')
   const [status, setStatus] = useState('미완료')
   const [q, setQ] = useState('')
+  const [addTask, setAddTask] = useState(false)
+  const [editTask, setEditTask] = useState<Task | undefined>()
   const [title, setTitle] = useState('')
   const [newPhase, setNewPhase] = useState<PhaseKey>('초청·계약')
   const [due, setDue] = useState(conf.startDate)
@@ -59,7 +63,13 @@ export function TasksPage() {
             담당자·단계별로 필터링해 주간 운영 회의 자료로 사용할 수 있습니다.
           </p>
         </div>
+        <div className="row-wrap no-print">
+          <button className="btn btn-primary" onClick={() => setAddTask(true)}>＋ 업무 추가</button>
+        </div>
       </div>
+
+      <TaskDialog open={addTask} onClose={() => setAddTask(false)} />
+      <TaskDialog edit={editTask} open={!!editTask} onClose={() => setEditTask(undefined)} />
 
       <div className="grid g4">
         <StatTile label="전체 업무" value={all.length} unit="건" foot={`${labels.speaker}별 ${all.filter(t => t.speakerId).length}건 · 공통 ${all.filter(t => !t.speakerId).length}건`} />
@@ -105,7 +115,7 @@ export function TasksPage() {
 
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th style={{ width: 34 }}></th><th>업무</th><th>단계</th><th>대상 {labels.speaker}</th><th>담당</th><th>기한</th><th>D-day</th><th>상태</th></tr></thead>
+            <thead><tr><th style={{ width: 34 }}></th><th>업무</th><th>단계</th><th>대상 {labels.speaker}</th><th>담당</th><th>기한</th><th>D-day</th><th>상태</th><th className="no-print">수정</th></tr></thead>
             <tbody>
               {rows.slice(0, 200).map(t => {
                 const sp = state.speakers.find(s => s.id === t.speakerId)
@@ -125,10 +135,11 @@ export function TasksPage() {
                     <td className="num nowrap small">{fmtDate(t.dueDate)}</td>
                     <td className="num nowrap"><Badge tone={late ? 'critical' : t.status === '완료' ? 'neutral' : 'info'}>{ddayLabel(t.dueDate)}</Badge></td>
                     <td><StatusBadge status={late && t.status !== '완료' ? '지연' : t.status} /></td>
+                    <td className="no-print"><button className="btn btn-sm" title="수정" onClick={() => setEditTask(t)}>✎</button></td>
                   </tr>
                 )
               })}
-              {!rows.length && <tr><td colSpan={8} className="empty">조건에 맞는 업무가 없습니다.</td></tr>}
+              {!rows.length && <tr><td colSpan={9} className="empty">조건에 맞는 업무가 없습니다.</td></tr>}
             </tbody>
           </table>
         </div>

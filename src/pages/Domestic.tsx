@@ -8,6 +8,7 @@ import { activeConference, sessionsOf } from '../lib/metrics'
 import { Badge, Card, Empty, HBars, StackBar, StatTile, StatusBadge } from '../components/ui'
 import { CreditDialog, SponsorDialog } from '../components/DomesticEdit'
 import { AbstractDialog, AbstractImportDialog } from '../components/AbstractEdit'
+import { RegistrationDialog, RegistrationImportDialog } from '../components/RegistrationEdit'
 import { Comments } from '../components/Comments'
 import { ddayLabel, fmtDate, krw, krwShort, pct, today } from '../lib/format'
 import { downloadCsv } from '../lib/csv'
@@ -263,6 +264,9 @@ export function Abstracts() {
 
 export function Registrations() {
   const { state, dispatch } = useApp()
+  const [addReg, setAddReg] = useState(false)
+  const [editReg, setEditReg] = useState<Registration | undefined>()
+  const [importReg, setImportReg] = useState(false)
   const conf = activeConference(state)
   const all = state.registrations.filter(r => r.conferenceId === conf.id)
   const [type, setType] = useState('전체')
@@ -289,11 +293,18 @@ export function Registrations() {
             미입력 건은 등록데스크에서 확인하도록 표시됩니다.
           </p>
         </div>
-        <button className="btn no-print" onClick={() => downloadCsv(`${conf.code}_참가등록명단.csv`, [
+        <div className="row-wrap no-print">
+        <button className="btn btn-primary" onClick={() => setAddReg(true)}>＋ 참가자 등록</button>
+        <button className="btn" onClick={() => setImportReg(true)}>⬆ CSV 일괄 등록</button>
+        <button className="btn" onClick={() => downloadCsv(`${conf.code}_참가등록명단.csv`, [
           ['등록번호', '성명', '소속', '진료과', '면허번호', '구분', '경로', '등록비', '납부', '결제수단', '등록일', '식권'],
           ...all.map(r => [r.id, r.name, r.affiliation, r.department, r.licenseNo, r.type, r.channel, r.fee, r.paid ? 'Y' : 'N', r.payMethod, r.registeredAt, r.mealTicket ? 'Y' : 'N']),
         ])}>⬇ 등록 명단 내보내기</button>
+        </div>
       </div>
+      <RegistrationDialog open={addReg} onClose={() => setAddReg(false)} />
+      <RegistrationDialog edit={editReg} open={!!editReg} onClose={() => setEditReg(undefined)} />
+      <RegistrationImportDialog open={importReg} onClose={() => setImportReg(false)} />
 
       <div className="grid g5">
         <StatTile label="총 등록" value={all.length} unit="명" bar={pct(all.length, target)}
@@ -331,7 +342,7 @@ export function Registrations() {
         </div>
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>성명</th><th>소속·진료과</th><th>면허번호</th><th>구분</th><th>경로</th><th className="right">등록비</th><th>납부</th><th>등록일</th><th className="no-print">현장</th></tr></thead>
+            <thead><tr><th>성명</th><th>소속·진료과</th><th>면허번호</th><th className="nowrap">구분</th><th className="nowrap">경로</th><th className="right">등록비</th><th>납부</th><th>등록일</th><th className="no-print">현장</th><th className="no-print">수정</th></tr></thead>
             <tbody>
               {rows.slice(0, 120).map(r => (
                 <tr key={r.id}>
@@ -342,8 +353,8 @@ export function Registrations() {
                       ? <span className="muted">해당없음</span>
                       : <Badge tone="critical">누락</Badge>)}
                   </td>
-                  <td className="small">{r.type}</td>
-                  <td className="small">{r.channel}</td>
+                  <td className="small nowrap">{r.type}</td>
+                  <td className="small nowrap">{r.channel}</td>
                   <td className="right num">{krw(r.fee)}</td>
                   <td>{r.paid ? <Badge tone="good">완료</Badge> : <Badge tone="warning">미납</Badge>}</td>
                   <td className="small num nowrap">{fmtDate(r.registeredAt)}</td>
@@ -353,8 +364,16 @@ export function Registrations() {
                       {r.attended ? '체크인' : '미체크인'}
                     </button>
                   </td>
+                  <td className="no-print">
+                    <button className="btn btn-sm" title="상세 수정" onClick={() => setEditReg(r)}>✎</button>
+                  </td>
                 </tr>
               ))}
+              {!rows.length && (
+                <tr><td colSpan={10} className="empty">
+                  {all.length ? '조건에 맞는 등록자가 없습니다.' : '등록자가 없습니다. 「＋ 참가자 등록」으로 직접 넣거나 「⬆ CSV 일괄 등록」으로 명단 파일을 올리세요.'}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>

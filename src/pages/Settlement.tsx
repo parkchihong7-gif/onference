@@ -1,4 +1,7 @@
 import { useApp } from '../store'
+import { useState } from 'react'
+import { ExpenseDialog } from '../components/OpsEdit'
+import type { Expense, Speaker } from '../types'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, HBars, StatTile, StackBar } from '../components/ui'
 import { flag, krw, krwShort, pct } from '../lib/format'
@@ -8,6 +11,7 @@ import { downloadCsv } from '../lib/csv'
 
 export function Settlement() {
   const { state } = useApp()
+  const [expenseFor, setExpenseFor] = useState<{ s: Speaker; e?: Expense } | undefined>()
   const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const list = speakersOf(state).filter(s => ['수락', '계약완료'].includes(s.stage))
@@ -37,6 +41,8 @@ export function Settlement() {
 
   return (
     <>
+
+    {expenseFor && <ExpenseDialog open onClose={() => setExpenseFor(undefined)} speaker={expenseFor.s} edit={expenseFor.e} />}
       <div className="page-head">
         <div>
           <h1 className="page-title">정산·예산</h1>
@@ -94,7 +100,7 @@ export function Settlement() {
           <table className="data">
             <thead>
               <tr><th>{labels.speaker}</th><th>등급</th><th>소득 구분</th><th className="right">사례비</th><th className="right">원천징수율</th><th className="right">원천세</th><th className="right">실지급</th>
-                <th>조세조약</th><th>증명서</th><th className="right">실비</th><th className="right">총액</th><th>송금 정보</th></tr>
+                <th>조세조약</th><th>증명서</th><th className="right">실비</th><th className="right">총액</th><th>송금 정보</th><th className="no-print">실비 등록</th></tr>
             </thead>
             <tbody>
               {list.map(s => {
@@ -114,6 +120,19 @@ export function Settlement() {
                     <td className="right num">{krw(exp)}</td>
                     <td className="right num"><strong>{krw(s.settlement.honorarium + exp)}</strong></td>
                     <td className="xsmall muted">{s.settlement.remittance ? `${s.settlement.remittance.bankName} · ${s.settlement.remittance.accountMasked}` : '미수집'}</td>
+                    <td className="no-print" onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-sm" title="실비 등록" onClick={() => setExpenseFor({ s })}>＋</button>
+                      {s.settlement.expenses.length > 0 && (
+                        <select className="select btn-sm" style={{ marginLeft: 4, maxWidth: 110 }} value=""
+                          onChange={e => {
+                            const d = s.settlement.expenses.find(x => x.id === e.target.value)
+                            if (d) setExpenseFor({ s, e: d })
+                          }}>
+                          <option value="">수정…</option>
+                          {s.settlement.expenses.map(x => <option key={x.id} value={x.id}>{x.category} {x.amountKRW.toLocaleString()}</option>)}
+                        </select>
+                      )}
+                    </td>
                   </tr>
                 )
               })}

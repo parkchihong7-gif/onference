@@ -5,7 +5,7 @@
  */
 import type {
   AppState, ChecklistTemplate, Conference, ConferenceScope, Deliverable, DeliverableType,
-  Industry, Member, Milestone, ModuleKey, Session, Speaker, SpeakerTier, Task,
+  DeliveryMode, Industry, Member, Milestone, ModuleKey, Session, Speaker, SpeakerTier, Sponsorship, Task,
 } from '../types'
 import { CORE_MODULES, DOMESTIC_MODULES, OVERSEAS_MODULES } from '../types'
 import { addDays } from '../data/base'
@@ -73,7 +73,14 @@ export const defaultModules = (scope: ConferenceScope, industry: Industry): Modu
 ]
 
 /** 행사 성격에 맞는 기본 마일스톤 (개막일 기준 역산) */
-function defaultMilestones(start: string, scope: ConferenceScope, modules: ModuleKey[]): Milestone[] {
+/** 업무 단계별 기본 담당 역할 — 마일스톤 담당자 자동 배정에 쓴다 */
+const PHASE_ROLE: Record<string, string> = {
+  '기획·세팅': '사무국', '발굴·선정': '사무국', '초청·계약': '리에종',
+  '출입국·비자': '사무국', '여행·의전': '여행사', '콘텐츠·발표': 'PCO',
+  '현장운영': 'PCO', '정산·사후': '재무',
+}
+
+function defaultMilestones(start: string, scope: ConferenceScope, modules: ModuleKey[], members: Member[] = []): Milestone[] {
   const base: [string, number, Milestone['phase']][] = scope === '국제'
     ? [
       ['연사 선정위원회 확정', -150, '발굴·선정'],
@@ -106,7 +113,11 @@ function defaultMilestones(start: string, scope: ConferenceScope, modules: Modul
       if (label.includes('사전등록')) return modules.includes('참가등록')
       return true
     })
-    .map(([label, off, phase], i) => ({ id: `MS-${i + 1}`, label, date: addDays(start, off), phase }))
+    .map(([label, off, phase], i) => {
+      const role = PHASE_ROLE[phase] ?? '사무국'
+      const owner = members.find(m => m.role === role)?.id ?? members.find(m => m.role === '사무국')?.id ?? members[0]?.id
+      return { id: `MS-${i + 1}`, label, date: addDays(start, off), phase, ...(owner ? { owner } : {}) }
+    })
 }
 
 const ROLE_OWNER: Record<string, string> = {
@@ -177,7 +188,7 @@ export function createConference(state: AppState, input: NewConferenceInput): Cr
     invitationBudgetKRW: input.invitationBudgetKRW,
     baseCurrency: 'KRW',
     tracks: input.tracks.filter(Boolean),
-    milestones: defaultMilestones(input.startDate, input.scope, input.modules),
+    milestones: defaultMilestones(input.startDate, input.scope, input.modules, state.members),
     notes: source ? `${source.nameKo} 구성을 본떠 생성` : undefined,
   }
 
@@ -225,6 +236,14 @@ export interface NewSpeakerInput {
   honorarium: number
   sessionIds: string[]
   memo?: string
+  assistantEmail?: string
+  researchFields?: string[]
+  languages?: string[]
+  dietary?: string
+  accessibility?: string
+  interpretationNeeded?: boolean
+  sponsorship?: Sponsorship
+  attendanceMode?: DeliveryMode
 }
 
 const DOMESTIC_DOCS: { type: DeliverableType; offset: number }[] = [
@@ -278,24 +297,27 @@ export function createSpeaker(state: AppState, conf: Conference, input: NewSpeak
     department: input.department?.trim(),
     country: overseas ? (input.country?.trim() || '기타') : '대한민국',
     city: input.city?.trim() ?? '',
+    ...(input.assistantEmail ? { assistantEmail: input.assistantEmail } : {}),
+    ...(input.dietary ? { dietary: input.dietary } : {}),
+    ...(input.accessibility ? { accessibility: input.accessibility } : {}),
     timezone: overseas ? '' : 'Asia/Seoul (UTC+9)',
     email: input.email.trim(),
     phone: input.phone?.trim(),
-    researchFields: [],
-    languages: overseas ? ['EN'] : ['KO'],
+    researchFields: input.researchFields ?? [],
+    languages: input.languages?.length ? input.languages : (overseas ? ['EN'] : ['KO']),
     tier: input.tier,
     residency: input.residency,
     stage: '후보발굴',
     attendance: '참석미정',
-    sponsorship: 'Sponsored',
+    sponsorship: input.sponsorship ?? 'Sponsored',
     priority: input.tier === 'Keynote' ? '상' : '중',
-    attendanceMode: '현장',
+    attendanceMode: input.attendanceMode ?? '현장',
     supportPackageId: input.supportPackageId,
     liaisonMemberId: input.liaisonMemberId,
     principalMemberId: state.members.find(m => m.role === '사무국')?.id ?? input.liaisonMemberId,
     sessionIds: input.sessionIds,
     agreementStatus: '미발송',
-    interpretationNeeded: overseas,
+    interpretationNeeded: input.interpretationNeeded ?? overseas,
     companions: [],
     visa: overseas
       ? { required: true, track: '기타', stage: '판정대기', ketaRequired: false, ketaStatus: '해당없음', ccviRequired: false, leadTimeDays: 21, guaranteeLetterRequired: false }

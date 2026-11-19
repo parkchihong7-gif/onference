@@ -9,7 +9,9 @@ import {
 } from '../lib/factory'
 import { addDays } from '../data/base'
 import { today } from '../lib/format'
-import type { Conference, ConferenceScope, Industry, Session, Speaker, SpeakerTier } from '../types'
+import type {
+  Conference, ConferenceScope, DeliveryMode, Industry, Session, Speaker, SpeakerTier, Sponsorship,
+} from '../types'
 
 const INDUSTRIES: Industry[] = ['의료·학회', '학술', '기업', '공공', '협회']
 const TIERS: SpeakerTier[] = ['Keynote', 'Invited', 'Panel', 'Moderator', 'Chair', 'Workshop']
@@ -253,25 +255,60 @@ export function SpeakerDialog(
   const [tier, setTier] = useState<SpeakerTier>('Invited')
   const [liaison, setLiaison] = useState(state.members.find(m => m.role === '리에종')?.id ?? state.members[0]?.id ?? '')
   const [pkg, setPkg] = useState(packages[0]?.id ?? '')
-  const [honorarium, setHonorarium] = useState(500_000)
+  const [honorarium, setHonorarium] = useState(packages[0]?.honorariumKRW ?? 500_000)
+  /** 사용자가 직접 금액을 고친 뒤에는 패키지를 바꿔도 덮어쓰지 않는다 */
+  const [honorariumTouched, setHonorariumTouched] = useState(false)
   const [sessionIds, setSessionIds] = useState<string[]>([])
   const [memo, setMemo] = useState('')
+  const [city, setCity] = useState('')
+  const [assistantEmail, setAssistantEmail] = useState('')
+  const [researchFields, setResearchFields] = useState('')
+  const [langs, setLangs] = useState('')
+  const [dietary, setDietary] = useState('')
+  const [accessibility, setAccessibility] = useState('')
+  const [interpretation, setInterpretation] = useState(false)
+  const [sponsorship, setSponsorship] = useState<Sponsorship>('Sponsored')
+  const [attendanceMode, setAttendanceMode] = useState<DeliveryMode>('현장')
   const [err, setErr] = useState('')
 
   useEffect(() => {
     if (!open) return
     if (edit) {
+      setCity(edit.city ?? '')
+      setAssistantEmail(edit.assistantEmail ?? '')
+      setResearchFields((edit.researchFields ?? []).join(', '))
+      setLangs((edit.languages ?? []).join(', '))
+      setDietary(edit.dietary ?? '')
+      setAccessibility(edit.accessibility ?? '')
+      setInterpretation(!!edit.interpretationNeeded)
+      setSponsorship(edit.sponsorship)
+      setAttendanceMode(edit.attendanceMode)
       setResidency(edit.residency); setNameKo(edit.nameKo ?? ''); setNameEn(edit.nameEn ?? '')
       setTitle(edit.title ?? ''); setAffiliation(edit.affiliation ?? ''); setDepartment(edit.department ?? '')
       setCountry(edit.country ?? ''); setEmail(edit.email ?? ''); setPhone(edit.phone ?? '')
       setTier(edit.tier); setLiaison(edit.liaisonMemberId ?? '')
       setPkg(edit.supportPackageId ?? '')
       setHonorarium(edit.settlement?.honorarium ?? 0)
+      setHonorariumTouched(true)
       setSessionIds(edit.sessionIds ?? [])
       setMemo(edit.memo ?? '')
     }
+    if (!edit) setHonorariumTouched(false)
     setErr('')
   }, [open, edit])
+
+  // 등급·패키지를 고르면 학회 규정 단가를 자동으로 채운다
+  useEffect(() => {
+    if (honorariumTouched) return
+    const p = packages.find(x => x.id === pkg)
+    if (p) setHonorarium(p.honorariumKRW)
+  }, [pkg, packages, honorariumTouched])
+
+  // 등급을 바꾸면 그 등급의 패키지로 맞춘다(없으면 유지)
+  useEffect(() => {
+    const byTier = packages.find(p => p.tier === tier)
+    if (byTier) setPkg(byTier.id)
+  }, [tier, packages])
 
   const submit = () => {
     if (!nameKo.trim() && !nameEn.trim()) { setErr('성명을 입력하세요.'); return }
@@ -282,9 +319,15 @@ export function SpeakerDialog(
         type: 'PATCH_SPEAKER', id: edit.id,
         patch: {
           nameKo: nameKo || nameEn, nameEn, title, affiliation, department,
-          residency, country, email, phone, tier,
+          residency, country, city, email, phone, tier,
           liaisonMemberId: liaison, supportPackageId: pkg,
-          sessionIds, memo,
+          sessionIds, memo, assistantEmail,
+          researchFields: researchFields.split(',').map(x => x.trim()).filter(Boolean),
+          languages: langs.split(',').map(x => x.trim()).filter(Boolean),
+          dietary: dietary || undefined,
+          accessibility: accessibility || undefined,
+          interpretationNeeded: interpretation,
+          sponsorship, attendanceMode,
           settlement: { ...edit.settlement, honorarium },
         },
         audit: { memo: '정보 수정' },
@@ -294,9 +337,14 @@ export function SpeakerDialog(
     }
     const input: NewSpeakerInput = {
       nameKo: nameKo || nameEn, nameEn, title, affiliation, department,
-      residency, country, email, phone, tier,
+      residency, country, city, email, phone, tier,
       liaisonMemberId: liaison, supportPackageId: pkg,
       honorarium, sessionIds, memo,
+      assistantEmail,
+      researchFields: researchFields.split(',').map(x => x.trim()).filter(Boolean),
+      languages: langs.split(',').map(x => x.trim()).filter(Boolean),
+      dietary, accessibility, interpretationNeeded: interpretation,
+      sponsorship, attendanceMode,
     }
     const created = createSpeaker(state, conf, input)
     dispatch({ type: 'ADD_SPEAKER', ...created })
@@ -367,8 +415,10 @@ export function SpeakerDialog(
           </select>
         </Field>
 
-        <Field label={conf.scope === '국내' ? '사례비 (원)' : '강연료 (원)'} hint={residency === '국내' ? '기타소득 8.8% 원천징수 기준' : '비거주자 22% 기준'}>
-          <input className="input" type="number" min={0} step={100_000} value={honorarium} onChange={e => setHonorarium(Number(e.target.value))} />
+        <Field label={`${labels.honorarium} (원)`}
+          hint={`${residency === '국내' ? '기타소득 8.8% 원천징수 기준' : '비거주자 22% 기준'} · 지원 패키지 기본 단가 자동 적용`}>
+          <input className="input" type="number" min={0} step={100_000} value={honorarium}
+            onChange={e => { setHonorarium(Number(e.target.value)); setHonorariumTouched(true) }} />
         </Field>
         <Field label="배정 세션" hint="복수 선택 가능">
           <select className="select" multiple size={3} value={sessionIds}
@@ -376,6 +426,43 @@ export function SpeakerDialog(
             {sessions.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
           </select>
         </Field>
+
+        <Field label="도시">
+          <input className="input" value={city} onChange={e => setCity(e.target.value)} placeholder={residency === '해외' ? 'Palo Alto' : '서울'} />
+        </Field>
+        <Field label="비서·사무실 이메일" hint="연락은 비서를 통해 하는 경우">
+          <input className="input" type="email" value={assistantEmail} onChange={e => setAssistantEmail(e.target.value)} />
+        </Field>
+
+        <Field label="비용 지원 구분">
+          <select className="select" value={sponsorship} onChange={e => setSponsorship(e.target.value as Sponsorship)}>
+            {(['Sponsored', '부분지원', 'Non-Sponsored'] as Sponsorship[]).map(v => <option key={v}>{v}</option>)}
+          </select>
+        </Field>
+        <Field label="참가 형태">
+          <select className="select" value={attendanceMode} onChange={e => setAttendanceMode(e.target.value as DeliveryMode)}>
+            {(['현장', '온라인', '하이브리드'] as DeliveryMode[]).map(v => <option key={v}>{v}</option>)}
+          </select>
+        </Field>
+
+        <Field label="전문 분야" hint="쉼표로 구분">
+          <input className="input" value={researchFields} onChange={e => setResearchFields(e.target.value)} placeholder="심부전, 중재시술" />
+        </Field>
+        <Field label="사용 언어" hint="쉼표로 구분">
+          <input className="input" value={langs} onChange={e => setLangs(e.target.value)} placeholder={residency === '해외' ? 'EN' : 'KO'} />
+        </Field>
+
+        <Field label="식이 요구" hint="알러지·채식·종교식 등">
+          <input className="input" value={dietary} onChange={e => setDietary(e.target.value)} />
+        </Field>
+        <Field label="접근성 요구" hint="휠체어·보조 인력 등">
+          <input className="input" value={accessibility} onChange={e => setAccessibility(e.target.value)} />
+        </Field>
+
+        <label className="row small" style={{ gap: 8, gridColumn: '1 / -1' }}>
+          <input type="checkbox" checked={interpretation} onChange={e => setInterpretation(e.target.checked)} />
+          통역 필요
+        </label>
 
         <Field label="메모" span>
           <input className="input" value={memo} onChange={e => setMemo(e.target.value)} placeholder="특이사항·요구사항" />

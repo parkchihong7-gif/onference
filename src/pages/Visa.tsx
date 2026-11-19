@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { useApp } from '../store'
+import { VisaDialog } from '../components/OpsEdit'
+import type { Speaker } from '../types'
 import { activeConference, speakersOf, visaLeadDays, visaSlack } from '../lib/metrics'
 import { Badge, Card, StatTile, StatusBadge } from '../components/ui'
 import { flag, fmtDate, fmtDateTime } from '../lib/format'
@@ -11,6 +14,7 @@ const BOARD: VisaStage[] = ['판정대기', '서류요청', '서류수령', '초
 
 export function Visa() {
   const { state, dispatch } = useApp()
+  const [visaFor, setVisaFor] = useState<Speaker | undefined>()
   const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   // 출입국 절차는 '해외에서 오는 연자'에게만 해당한다 (행사가 국제인지와 무관).
@@ -29,6 +33,8 @@ export function Visa() {
 
   return (
     <>
+
+    {visaFor && <VisaDialog open onClose={() => setVisaFor(undefined)} speaker={visaFor} />}
       <div className="page-head">
         <div>
           <h1 className="page-title">출입국·비자 관리</h1>
@@ -112,6 +118,7 @@ export function Visa() {
                       onChange={e => dispatch({ type: 'SET_VISA_STAGE', id: s.id, stage: e.target.value as VisaStage })}>
                       {[...BOARD, '거절', '재신청', '해당없음'].map(v => <option key={v}>{v}</option>)}
                     </select>
+                    <button className="btn btn-sm" title="여권·사증 상세 수정" style={{ marginLeft: 4 }} onClick={() => setVisaFor(s)}>✎</button>
                   </td>
                 </tr>
               ))}
@@ -124,7 +131,7 @@ export function Visa() {
         <Card title="무비자·K-ETA 대상" sub="사증은 면제되나 전자여행허가·입국 서류 확인이 필요합니다">
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>{labels.speaker}</th><th>국적</th><th>구분</th><th>K-ETA</th><th>여권 만료</th><th>입국 예정</th></tr></thead>
+              <thead><tr><th>{labels.speaker}</th><th>국적</th><th>구분</th><th>K-ETA</th><th>여권 만료</th><th>입국 예정</th><th className="no-print">수정</th></tr></thead>
               <tbody>
                 {waiver.map(s => (
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
@@ -134,6 +141,9 @@ export function Visa() {
                     <td>{s.visa.ketaRequired ? <StatusBadge status={s.visa.ketaStatus ?? '신청전'} /> : <span className="muted small">해당없음</span>}</td>
                     <td className="small num">{fmtDate(s.passport?.expiryDate)}</td>
                     <td className="small num">{s.flights[0] ? fmtDate(s.flights[0].arriveAt) : '-'}</td>
+                    <td className="no-print" onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-sm" title="여권·사증 상세 수정" onClick={() => setVisaFor(s)}>✎</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

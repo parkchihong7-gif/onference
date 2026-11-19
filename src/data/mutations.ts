@@ -200,6 +200,33 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
     case 'PATCH_REGISTRATION':
       return [{ kind: 'patch', col: 'registrations', id: action.id, data: action.patch as Record<string, unknown> }]
 
+    case 'ADD_REGISTRATIONS': {
+      if (!action.registrations.length) return []
+      const one = action.registrations.length === 1 ? action.registrations[0] : undefined
+      return [
+        ...action.registrations.map(r => ({
+          kind: 'set' as const, col: 'registrations' as const, id: r.id,
+          data: r as unknown as Record<string, unknown>,
+        })),
+        auditMut(actor, {
+          action: '생성', entityType: '행사',
+          entityId: one?.id ?? action.registrations[0].conferenceId,
+          entityLabel: one ? one.name : `참가 등록 ${action.registrations.length}건`,
+          field: one ? '참가 등록' : '참가 등록 일괄 등록',
+          after: one ? `${one.type} · ${one.channel}` : `${action.registrations.length}건`,
+        }),
+      ]
+    }
+
+    case 'DELETE_REGISTRATION': {
+      const r = state.registrations.find(x => x.id === action.id)
+      if (!r) return []
+      return [
+        { kind: 'delete', col: 'registrations', id: r.id },
+        auditMut(actor, { action: '삭제', entityType: '행사', entityId: r.id, entityLabel: r.name, field: '참가 등록 삭제' }),
+      ]
+    }
+
     case 'ADD_ABSTRACTS': {
       if (!action.abstracts.length) return []
       const one = action.abstracts.length === 1 ? action.abstracts[0] : undefined
@@ -369,6 +396,59 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
       return [
         { kind: 'delete', col: 'sessions', id: ses.id },
         auditMut(actor, { action: '삭제', entityType: '세션', entityId: ses.id, entityLabel: ses.title, field: '세션 삭제' }),
+      ]
+    }
+
+    case 'ADD_MEMBER':
+      return [
+        { kind: 'set', col: 'members', id: action.member.id, data: action.member as unknown as Record<string, unknown> },
+        auditMut(actor, { action: '생성', entityType: '행사', entityId: action.member.id, entityLabel: action.member.name, field: '구성원 추가', after: action.member.role }),
+      ]
+
+    case 'PATCH_MEMBER': {
+      const m = state.members.find(x => x.id === action.id)
+      if (!m) return []
+      return [
+        { kind: 'patch', col: 'members', id: m.id, data: action.patch as Record<string, unknown> },
+        auditMut(actor, { action: '수정', entityType: '행사', entityId: m.id, entityLabel: action.patch.name ?? m.name, field: '구성원 정보' }),
+      ]
+    }
+
+    case 'DELETE_MEMBER': {
+      const m = state.members.find(x => x.id === action.id)
+      if (!m) return []
+      // 담당으로 지정된 레코드가 있으면 지우지 않는다(화면에서도 막지만 데이터 차원에서 한 번 더)
+      const inUse = state.speakers.some(s => s.liaisonMemberId === m.id || s.principalMemberId === m.id)
+        || state.tasks.some(t => t.ownerMemberId === m.id)
+      if (inUse) return []
+      return [
+        { kind: 'delete', col: 'members', id: m.id },
+        auditMut(actor, { action: '삭제', entityType: '행사', entityId: m.id, entityLabel: m.name, field: '구성원 삭제' }),
+      ]
+    }
+
+    case 'ADD_PACKAGE':
+      return [
+        { kind: 'set', col: 'supportPackages', id: action.pkg.id, data: action.pkg as unknown as Record<string, unknown> },
+        auditMut(actor, { action: '생성', entityType: '행사', entityId: action.pkg.id, entityLabel: action.pkg.name, field: '지원 패키지 추가' }),
+      ]
+
+    case 'PATCH_PACKAGE': {
+      const p = state.supportPackages.find(x => x.id === action.id)
+      if (!p) return []
+      return [
+        { kind: 'patch', col: 'supportPackages', id: p.id, data: action.patch as Record<string, unknown> },
+        auditMut(actor, { action: '수정', entityType: '행사', entityId: p.id, entityLabel: action.patch.name ?? p.name, field: '지원 패키지' }),
+      ]
+    }
+
+    case 'DELETE_PACKAGE': {
+      const p = state.supportPackages.find(x => x.id === action.id)
+      if (!p) return []
+      if (state.speakers.some(s => s.supportPackageId === p.id)) return []
+      return [
+        { kind: 'delete', col: 'supportPackages', id: p.id },
+        auditMut(actor, { action: '삭제', entityType: '행사', entityId: p.id, entityLabel: p.name, field: '지원 패키지 삭제' }),
       ]
     }
 

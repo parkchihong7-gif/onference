@@ -6,6 +6,7 @@ import { ddayLabel, flag, fmtDate, krwShort, today } from '../lib/format'
 import { displayName, labelsOf } from '../lib/scope'
 import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
+import type { Speaker } from '../types'
 import { SpeakerDialog } from '../components/Create'
 import type { PipelineStage } from '../types'
 
@@ -18,6 +19,7 @@ export function Pipeline() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<Speaker | undefined>()
 
   const drop = (stage: PipelineStage) => {
     if (dragId) dispatch({ type: 'SET_STAGE', id: dragId, stage })
@@ -40,6 +42,7 @@ export function Pipeline() {
       </div>
 
       <SpeakerDialog open={adding} onClose={() => setAdding(false)} />
+      <SpeakerDialog edit={editing} open={!!editing} onClose={() => setEditing(undefined)} />
 
       <div className="kanban">
         {COLUMNS.map(col => {
@@ -64,6 +67,8 @@ export function Pipeline() {
                       <span aria-hidden>{flag(s.country)}</span>
                       <strong className="small trunc" style={{ flex: 1 }}>{displayName(s)}</strong>
                       <TierTag tier={s.tier} />
+                      <button className="btn btn-sm no-print" title="연자 정보 수정"
+                        onClick={e => { e.stopPropagation(); setEditing(s) }}>✎</button>
                     </div>
                     <div className="xsmall muted trunc">{s.affiliation}</div>
                     <div className="row-wrap" style={{ gap: 4, marginTop: 6 }}>

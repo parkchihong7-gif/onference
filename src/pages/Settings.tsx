@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../store'
 import type { Invite } from '../data/backend'
 import { ConferenceDialog } from '../components/Create'
+import { MemberDialog, PackageDialog } from '../components/OpsEdit'
 import { activeConference } from '../lib/metrics'
 import { Badge, Card, DL, StatTile } from '../components/ui'
 import { CORE_MODULES, DOMESTIC_MODULES, OVERSEAS_MODULES } from '../types'
 import { needsOverseasModules, labelsOf } from '../lib/scope'
-import type { ModuleKey } from '../types'
+import type { Member, ModuleKey, SupportPackage } from '../types'
 import { fmtDate, krw } from '../lib/format'
 
 const ROLES = ['사무국', 'PCO', '리에종', '여행사', '재무', '연사'] as const
@@ -23,6 +24,10 @@ export function Settings() {
   const [newConf, setNewConf] = useState(false)
   const [freshConf, setFreshConf] = useState(false)
   const [editConf, setEditConf] = useState(false)
+  const [addMember, setAddMember] = useState(false)
+  const [editMember, setEditMember] = useState<Member | undefined>()
+  const [addPkg, setAddPkg] = useState(false)
+  const [editPkg, setEditPkg] = useState<SupportPackage | undefined>()
   const canInvite = invites.supported && status.user?.role === '사무국'
 
   useEffect(() => {
@@ -94,6 +99,10 @@ export function Settings() {
       <ConferenceDialog open={newConf} onClose={() => setNewConf(false)} />
       <ConferenceDialog fresh open={freshConf} onClose={() => setFreshConf(false)} />
       <ConferenceDialog edit={conf} open={editConf} onClose={() => setEditConf(false)} />
+      <MemberDialog open={addMember} onClose={() => setAddMember(false)} />
+      <MemberDialog edit={editMember} open={!!editMember} onClose={() => setEditMember(undefined)} />
+      <PackageDialog open={addPkg} onClose={() => setAddPkg(false)} />
+      <PackageDialog edit={editPkg} open={!!editPkg} onClose={() => setEditPkg(undefined)} />
 
       <Card title="데이터 저장 방식"
         sub={status.mode === '공유' ? '여러 담당자가 같은 데이터를 실시간으로 함께 봅니다' : '이 브라우저에만 저장됩니다'}>
@@ -223,10 +232,11 @@ export function Settings() {
             ['상태', <Badge tone="info">{conf.status}</Badge>],
           ]} />
         </Card>
-        <Card title="권한(역할) 구성" sub="역할별로 접근 가능한 데이터 범위를 분리합니다">
+        <Card title="권한(역할) 구성" sub="역할별로 접근 가능한 데이터 범위를 분리합니다"
+          right={<button className="btn btn-sm no-print" onClick={() => setAddMember(true)}>＋ 구성원 추가</button>}>
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>이름</th><th>역할</th><th>소속</th><th>연락처</th></tr></thead>
+              <thead><tr><th>이름</th><th>역할</th><th>소속</th><th>연락처</th><th className="no-print">수정</th></tr></thead>
               <tbody>
                 {state.members.map(m => (
                   <tr key={m.id}>
@@ -234,6 +244,7 @@ export function Settings() {
                     <td><Badge tone="neutral">{m.role}</Badge></td>
                     <td className="small nowrap">{m.org}</td>
                     <td className="small num">{m.phone ?? '-'}</td>
+                    <td className="no-print"><button className="btn btn-sm" title="수정" onClick={() => setEditMember(m)}>✎</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -250,10 +261,11 @@ export function Settings() {
         </Card>
       </div>
 
-      <Card title="등급별 지원 패키지" sub="초청 시 자동 적용되는 지원 범위 템플릿">
+      <Card title="등급별 지원 패키지" sub="초청 시 자동 적용되는 지원 범위 템플릿 · 기본 사례비가 연자 등록 폼에 채워집니다"
+        right={<button className="btn btn-sm no-print" onClick={() => setAddPkg(true)}>＋ 패키지 추가</button>}>
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>패키지</th><th>등급</th><th>항공</th><th>발권</th><th>숙박</th><th>정산</th><th className="right">일비</th><th className="right">강연료</th><th>지상교통</th><th>동반자</th><th>보험</th></tr></thead>
+            <thead><tr><th>패키지</th><th>등급</th><th>항공</th><th>발권</th><th>숙박</th><th>정산</th><th className="right">일비</th><th className="right">{labels.honorarium}</th><th>지상교통</th><th>동반자</th><th>보험</th><th className="no-print">수정</th></tr></thead>
             <tbody>
               {state.supportPackages.map(p => (
                 <tr key={p.id}>
@@ -268,6 +280,7 @@ export function Settings() {
                   <td className="small">{p.groundTransfer ? '제공' : '-'}</td>
                   <td className="small">{p.companionSupported ? (p.companionScope ?? '지원') : '-'}</td>
                   <td className="small">{p.insurance ? '가입' : '-'}</td>
+                  <td className="no-print"><button className="btn btn-sm" title="수정" onClick={() => setEditPkg(p)}>✎</button></td>
                 </tr>
               ))}
             </tbody>

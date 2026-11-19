@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import type {
   Abstract, AppState, Comment, Communication, Conference, CreditProgram, Deliverable, Doc,
-  ModuleKey, PipelineStage, Registration, Session, Speaker, Sponsor, Task, VisaStage,
+  ModuleKey, PipelineStage, Registration, Session, Speaker, Sponsor, Task, VisaStage, Member, SupportPackage,
 } from './types'
 import { initialState } from './data/seed'
 import { LocalBackend } from './data/backend'
@@ -31,6 +31,8 @@ export type Action =
   | { type: 'ADD_ABSTRACTS'; abstracts: Abstract[] }
   | { type: 'DELETE_ABSTRACT'; id: string }
   | { type: 'PATCH_REGISTRATION'; id: string; patch: Partial<Registration> }
+  | { type: 'ADD_REGISTRATIONS'; registrations: Registration[] }
+  | { type: 'DELETE_REGISTRATION'; id: string }
   | { type: 'PATCH_SPONSOR'; id: string; patch: Partial<Sponsor> }
   | { type: 'ADD_SPONSOR'; sponsor: Sponsor }
   | { type: 'DELETE_SPONSOR'; id: string }
@@ -43,6 +45,12 @@ export type Action =
   | { type: 'PATCH_SESSION'; id: string; patch: Partial<Session> }
   | { type: 'DELETE_SESSION'; id: string }
   | { type: 'DELETE_SPEAKER'; id: string }
+  | { type: 'ADD_MEMBER'; member: Member }
+  | { type: 'PATCH_MEMBER'; id: string; patch: Partial<Member> }
+  | { type: 'DELETE_MEMBER'; id: string }
+  | { type: 'ADD_PACKAGE'; pkg: SupportPackage }
+  | { type: 'PATCH_PACKAGE'; id: string; patch: Partial<SupportPackage> }
+  | { type: 'DELETE_PACKAGE'; id: string }
   | { type: 'TOGGLE_MODULE'; conferenceId: string; module: ModuleKey }
   | { type: 'RESET' }
 

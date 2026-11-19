@@ -8,10 +8,12 @@ import { go } from '../lib/router'
 import { PIPELINE_ORDER } from '../types'
 import { useState } from 'react'
 import { SpeakerDialog, SessionDialog, ConferenceDialog } from '../components/Create'
+import { MilestoneDialog } from '../components/MilestoneEdit'
 
 export function Dashboard() {
   const { state } = useApp()
   const [addSpeaker, setAddSpeaker] = useState(false)
+  const [editMilestones, setEditMilestones] = useState(false)
   const [addSession, setAddSession] = useState(false)
   const [addConf, setAddConf] = useState(false)
   const conf = activeConference(state)
@@ -162,6 +164,7 @@ export function Dashboard() {
   return (
     <>
       <SpeakerDialog open={addSpeaker} onClose={() => setAddSpeaker(false)} />
+      <MilestoneDialog open={editMilestones} onClose={() => setEditMilestones(false)} />
       <div className="page-head">
         <div>
           <h1 className="page-title">{conf.nameKo}</h1>
@@ -399,7 +402,8 @@ export function Dashboard() {
       </div>
 
       <div className="grid g2">
-        <Card title="마일스톤" sub={`개막 ${fmtDate(conf.startDate)} 기준으로 역산한 일정 · D-day 는 오늘 기준`}>
+        <Card title="마일스톤" sub={`개막 ${fmtDate(conf.startDate)} 기준으로 역산한 일정 · D-day 는 오늘 기준`}
+          right={<button className="btn btn-sm no-print" title="마일스톤 수정" onClick={() => setEditMilestones(true)}>✎ 관리</button>}>
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th>일정</th><th>오늘 기준</th><th>개막 기준</th><th>마일스톤</th><th>단계</th><th>담당</th></tr></thead>

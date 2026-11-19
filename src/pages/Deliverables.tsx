@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../store'
+import { DeliverableDialog } from '../components/OpsEdit'
+import type { Deliverable, Speaker } from '../types'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, StatTile, StackBar } from '../components/ui'
 import { ddayLabel, flag, fmtDate, pct, today } from '../lib/format'
@@ -43,6 +45,7 @@ const CELL: Record<DeliverableStatus, { bg: string; mark: string; tone: string }
 
 export function Deliverables() {
   const { state, dispatch } = useApp()
+  const [docFor, setDocFor] = useState<{ s: Speaker; d: Deliverable } | undefined>()
   const labels = labelsOf(activeConference(state))
   const conf = activeConference(state)
   const list = speakersOf(state).filter(s => ['수락', '계약완료'].includes(s.stage))
@@ -74,6 +77,8 @@ export function Deliverables() {
 
   return (
     <>
+
+    {docFor && <DeliverableDialog open onClose={() => setDocFor(undefined)} speaker={docFor.s} deliverable={docFor.d} />}
       <div className="page-head">
         <div>
           <h1 className="page-title">제출물·콘텐츠 관리</h1>
@@ -104,7 +109,7 @@ export function Deliverables() {
         }))} height={12} />
       </Card>
 
-      <Card title="제출물 매트릭스" sub="셀: ✓ 검수완료 · ↑ 제출 · … 요청함 · ↺ 반려 · ! 기한초과 · · 요청전">
+      <Card title="제출물 매트릭스" sub="셀을 누르면 검수완료/요청함이 전환됩니다 · ✓ 검수완료 · ↑ 제출 · … 요청함 · ↺ 반려 · ! 기한초과 · · 요청전">
         <div className="table-wrap">
           <table className="data">
             <thead>
@@ -164,6 +169,7 @@ export function Deliverables() {
                   <td><Badge tone="warning">{d.status}</Badge></td>
                   <td className="no-print">
                     <button className="btn btn-sm" onClick={() => remind(s.id, `[Reminder] ${d.type} — due ${d.dueDate}`)}>✉ 리마인드 발송</button>
+                    <button className="btn btn-sm" title="기한·상태 수정" style={{ marginLeft: 4 }} onClick={() => setDocFor({ s, d })}>✎</button>
                   </td>
                 </tr>
               ))}

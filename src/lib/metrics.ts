@@ -70,8 +70,11 @@ export function computeRisks(state: AppState): Risk[] {
 
     const overseas = sp.residency === '해외'
 
-    /* 1. 비자 리드타임 (해외 연자 전용) */
-    if (overseas && sp.visa.required && !['발급완료'].includes(sp.visa.stage)) {
+    /* 1. 비자 리드타임 (해외 연자 전용)
+       아직 공식 초청 전이면 서류를 요청할 수 없으므로 경고하지 않는다.
+       (등록 직후부터 '서류 미수취' 가 뜨면 실제 지연과 구분되지 않는다) */
+    const invitedOut = ['공식초청', '수락', '계약완료'].includes(sp.stage)
+    if (overseas && invitedOut && sp.visa.required && !['발급완료'].includes(sp.visa.stage)) {
       const need = visaLeadDays(sp)
       if (sp.visa.stage === '거절') {
         push({ level: 'critical', category: '비자', title: '사증 거절 — 대체 시나리오 필요', detail: `${sp.visa.track} 거절. 재신청 또는 온라인 발표 전환 결정 필요.`, dueDate: conf.startDate })
@@ -216,8 +219,12 @@ export function kpis(state: AppState): Kpi {
   const responded = list.filter(sp => ['수락', '계약완료', '거절'].includes(sp.stage))
   const visaCases = list.filter(sp => sp.residency === '해외' && sp.visa.required && sp.stage !== '거절')
   const docs = confirmed.flatMap(sp => sp.deliverables)
-  // 근거리 자력 이동(도보·대중교통) 연자는 예약 대상이 아니므로 분모에서 제외한다.
-  const needFlights = confirmed.filter(sp => sp.attendanceMode !== '온라인' && (sp.residency === '해외' || sp.flights.length > 0))
+  /* 교통 집계 대상 — 현장 참석이면서 주최가 비용을 지원하는 연자.
+     국내 연자도 KTX·자가용 실비를 지급하므로 분모에 넣는다.
+     자비 참가(Non-Sponsored)는 주최가 예약·정산하지 않으므로 제외한다. */
+  const needFlights = confirmed.filter(sp =>
+    sp.attendanceMode !== '온라인'
+    && (sp.sponsorship !== 'Non-Sponsored' || sp.flights.length > 0))
   const tasks = tasksOf(state)
   const expenses = confirmed.flatMap(sp => sp.settlement.expenses)
   const honorarium = confirmed.reduce((a, sp) => a + sp.settlement.honorarium, 0)

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../store'
+import { SpeakerDialog } from '../components/Create'
 import { activeConference, buildItinerary, readiness, speakersOf, validateSpeaker, visaSlack } from '../lib/metrics'
 import type { DataIssue, ItineraryEvent } from '../lib/metrics'
 import { Badge, Card, DL, Empty, StatusBadge, TierTag } from '../components/ui'
@@ -11,6 +12,19 @@ import type { AttendanceStatus, Companion, Flight, Speaker } from '../types'
 
 const TABS = ['Personal Information', 'Booking Information', 'Itinerary Information'] as const
 const SUB = ['전체 보기', 'Flight', 'Accommodation', 'Protocol', 'Transportation', 'Program Registration'] as const
+
+/** 국내 학회 화면에서는 한글 표기를 쓴다(국제 행사는 레퍼런스대로 영문 유지) */
+const TAB_KO: Record<string, string> = {
+  'Personal Information': '인적 사항',
+  'Booking Information': '예약 정보',
+  'Itinerary Information': '개인 일정',
+}
+const SUB_KO: Record<string, string> = {
+  'Flight': '항공·교통', 'Accommodation': '숙박', 'Protocol': '의전',
+  'Transportation': '차량·이동', 'Program Registration': '프로그램 등록',
+}
+const tabLabel = (scope: string, t: string) => (scope === '국내' ? TAB_KO[t] ?? t : t)
+const subLabel = (scope: string, t: string) => (scope === '국내' ? SUB_KO[t] ?? t : t)
 const ATTENDANCE: AttendanceStatus[] = ['참석확정', '참석미정', '불참', '취소']
 
 /** 레이블 위 / 값 아래 형태의 필드 (레퍼런스 카드 레이아웃) */
@@ -142,7 +156,7 @@ export function Workspace() {
                       <button className="btn btn-sm btn-primary" onClick={() => addCompanion(s)}>저장</button>
                     </div>
                   ) : (
-                    <button className="ws-accompany" style={{ marginTop: 4 }} onClick={() => setAddingFor(s.id)}>＋ Accompany 추가</button>
+                    <button className="ws-accompany" style={{ marginTop: 4 }} onClick={() => setAddingFor(s.id)}>＋ 동반자 추가</button>
                   )}
                 </div>
               )
@@ -183,6 +197,7 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
   const { state } = useApp()
   const conf = activeConference(state)
   const labels = labelsOf(conf)
+  const [editing, setEditing] = useState(false)
   const issues = validateSpeaker(sp, conf)
   const r = readiness(sp)
   const inbound = sp.flights.find(f => f.direction === '입국')
@@ -196,6 +211,7 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
 
   return (
     <>
+      <SpeakerDialog edit={sp} open={editing} onClose={() => setEditing(false)} />
       <div className="ws-head">
         <div className="row-wrap" style={{ justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -218,13 +234,14 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
             <select className="select" value={sp.attendance} onChange={e => onAttendance(e.target.value as AttendanceStatus)} aria-label="참석 상태">
               {ATTENDANCE.map(a => <option key={a}>{a}</option>)}
             </select>
+            <button className="btn" title="연자 정보 수정" onClick={() => setEditing(true)}>✎ 정보 수정</button>
             <button className="btn" onClick={() => go('speakers', sp.id)}>전체 상세</button>
           </div>
         </div>
 
         <div className="tabs" style={{ marginTop: 14 }} role="tablist">
           {TABS.map(t => (
-            <button key={t} className="tab" role="tab" aria-selected={t === tab} onClick={() => setTab(t)}>{t}</button>
+            <button key={t} className="tab" role="tab" aria-selected={t === tab} onClick={() => setTab(t)}>{tabLabel(conf.scope, t)}</button>
           ))}
         </div>
       </div>
@@ -310,7 +327,7 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
       {tab === 'Booking Information' && (
         <>
           <div className="ws-subtabs no-print">
-            {SUB.map(s => <button key={s} className="ws-subtab" aria-pressed={sub === s} onClick={() => setSub(s)}>{s}</button>)}
+            {SUB.map(s => <button key={s} className="ws-subtab" aria-pressed={sub === s} onClick={() => setSub(s)}>{subLabel(conf.scope, s)}</button>)}
           </div>
 
           {showFlight && (
