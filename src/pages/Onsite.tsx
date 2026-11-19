@@ -140,7 +140,7 @@ export function Onsite() {
                 {state.members.filter(m => ['리에종', 'PCO', '사무국'].includes(m.role)).map(m => (
                   <tr key={m.id}>
                     <td><Badge tone="neutral">{m.role}</Badge></td>
-                    <td>{m.name}</td><td className="small">{m.org}</td>
+                    <td className="nowrap">{m.name}</td><td className="small nowrap">{m.org}</td>
                     <td className="num small">{m.phone}</td>
                     <td className="xsmall muted">{list.filter(s => s.liaisonMemberId === m.id).length}명</td>
                   </tr>

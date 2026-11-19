@@ -200,6 +200,33 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
     case 'PATCH_REGISTRATION':
       return [{ kind: 'patch', col: 'registrations', id: action.id, data: action.patch as Record<string, unknown> }]
 
+    case 'ADD_ABSTRACTS': {
+      if (!action.abstracts.length) return []
+      const one = action.abstracts.length === 1 ? action.abstracts[0] : undefined
+      return [
+        ...action.abstracts.map(a => ({
+          kind: 'set' as const, col: 'abstracts' as const, id: a.id,
+          data: a as unknown as Record<string, unknown>,
+        })),
+        auditMut(actor, {
+          action: '생성', entityType: '행사',
+          entityId: one?.id ?? action.abstracts[0].conferenceId,
+          entityLabel: one ? one.title : `초록 ${action.abstracts.length}건`,
+          field: one ? '초록 등록' : '초록 일괄 등록',
+          after: one ? `${one.presentType} · ${one.track}` : `${action.abstracts.length}건`,
+        }),
+      ]
+    }
+
+    case 'DELETE_ABSTRACT': {
+      const a = state.abstracts.find(x => x.id === action.id)
+      if (!a) return []
+      return [
+        { kind: 'delete', col: 'abstracts', id: a.id },
+        auditMut(actor, { action: '삭제', entityType: '행사', entityId: a.id, entityLabel: a.title, field: '초록 삭제' }),
+      ]
+    }
+
     case 'ADD_SPONSOR':
       return [
         { kind: 'set', col: 'sponsors', id: action.sponsor.id, data: action.sponsor as unknown as Record<string, unknown> },

@@ -232,7 +232,7 @@ export function Settings() {
                   <tr key={m.id}>
                     <td>{m.name}</td>
                     <td><Badge tone="neutral">{m.role}</Badge></td>
-                    <td className="small">{m.org}</td>
+                    <td className="small nowrap">{m.org}</td>
                     <td className="small num">{m.phone ?? '-'}</td>
                   </tr>
                 ))}

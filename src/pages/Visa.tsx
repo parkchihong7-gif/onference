@@ -130,7 +130,7 @@ export function Visa() {
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
                     <td>{displayName(s)}</td>
                     <td className="nowrap">{flag(s.country)} {s.country}</td>
-                    <td className="small">{s.visa.track}</td>
+                    <td className="small nowrap">{s.visa.track}</td>
                     <td>{s.visa.ketaRequired ? <StatusBadge status={s.visa.ketaStatus ?? '신청전'} /> : <span className="muted small">해당없음</span>}</td>
                     <td className="small num">{fmtDate(s.passport?.expiryDate)}</td>
                     <td className="small num">{s.flights[0] ? fmtDate(s.flights[0].arriveAt) : '-'}</td>

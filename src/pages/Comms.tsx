@@ -93,7 +93,7 @@ export function Comms() {
               {state.mailTemplates.map(t => (
                 <tr key={t.id} className="clickable" onClick={() => setPreview(t)}>
                   <td><strong>{t.name}</strong></td>
-                  <td className="small muted">{t.phase}</td>
+                  <td className="small muted nowrap">{t.phase}</td>
                   <td className="small">{t.language}</td>
                   <td className="small trunc" style={{ maxWidth: 320 }}>{t.subject}</td>
                   <td className="xsmall muted">{t.trigger ?? '-'}</td>

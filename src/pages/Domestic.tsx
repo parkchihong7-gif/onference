@@ -7,6 +7,7 @@ import { useApp } from '../store'
 import { activeConference, sessionsOf } from '../lib/metrics'
 import { Badge, Card, Empty, HBars, StackBar, StatTile, StatusBadge } from '../components/ui'
 import { CreditDialog, SponsorDialog } from '../components/DomesticEdit'
+import { AbstractDialog, AbstractImportDialog } from '../components/AbstractEdit'
 import { Comments } from '../components/Comments'
 import { ddayLabel, fmtDate, krw, krwShort, pct, today } from '../lib/format'
 import { downloadCsv } from '../lib/csv'
@@ -128,6 +129,9 @@ export function Credits() {
 
 export function Abstracts() {
   const { state, dispatch } = useApp()
+  const [addAbstract, setAddAbstract] = useState(false)
+  const [editAbstract, setEditAbstract] = useState<Abstract | undefined>()
+  const [importing, setImporting] = useState(false)
   const conf = activeConference(state)
   const all = state.abstracts.filter(a => a.conferenceId === conf.id)
   const [status, setStatus] = useState('전체')
@@ -153,11 +157,18 @@ export function Abstracts() {
             배정 결과가 프로그램·현장 운영과 연동됩니다.
           </p>
         </div>
-        <button className="btn no-print" onClick={() => downloadCsv(`${conf.code}_초록심사결과.csv`, [
+        <div className="row-wrap no-print">
+        <button className="btn btn-primary" onClick={() => setAddAbstract(true)}>＋ 초록 등록</button>
+        <button className="btn" onClick={() => setImporting(true)}>⬆ CSV 일괄 등록</button>
+        <button className="btn" onClick={() => downloadCsv(`${conf.code}_초록심사결과.csv`, [
           ['초록번호', '제목', '저자', '소속', '트랙', '발표형식', '투고일', '평균점수', '상태', '배정세션'],
           ...all.map(a => [a.code, a.title, a.authorName, a.affiliation, a.track, a.presentType, a.submittedAt, avg(a).toFixed(1), a.status, a.sessionId]),
         ])}>⬇ 심사 결과 내보내기</button>
+        </div>
       </div>
+      <AbstractDialog open={addAbstract} onClose={() => setAddAbstract(false)} />
+      <AbstractDialog edit={editAbstract} open={!!editAbstract} onClose={() => setEditAbstract(undefined)} />
+      <AbstractImportDialog open={importing} onClose={() => setImporting(false)} />
 
       <div className="grid g4">
         <StatTile label="총 투고" value={all.length} unit="편" foot={`구연 ${all.filter(a => a.presentType === '구연').length} · 포스터 ${all.filter(a => a.presentType === '포스터').length}`} />
@@ -180,15 +191,16 @@ export function Abstracts() {
           </div>
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>번호</th><th>제목</th><th>저자</th><th>트랙</th><th>형식</th><th className="right">평균</th><th>상태</th><th className="no-print">심사</th></tr></thead>
+              <thead><tr><th>번호</th><th>제목</th><th>저자</th><th className="nowrap">트랙</th><th className="nowrap">형식</th><th className="right">평균</th><th className="nowrap">상태</th><th className="no-print">심사</th></tr></thead>
               <tbody>
                 {rows.map(a => (
                   <tr key={a.id} className="clickable" onClick={() => setSel(a.id)}>
                     <td className="num small nowrap">{a.code}</td>
-                    <td className="trunc" style={{ maxWidth: 320 }}>{a.title}</td>
+                    <td className="trunc" style={{ maxWidth: 300 }}>{a.title}</td>
                     <td className="small nowrap">{a.authorName}<div className="xsmall muted trunc" style={{ maxWidth: 120 }}>{a.affiliation}</div></td>
-                    <td className="small">{a.track}</td>
-                    <td className="small">{a.presentType}</td>
+                    {/* 좁은 열에서 한글이 글자 단위로 쪼개지지 않도록 한 줄로 고정한다 */}
+                    <td className="small nowrap">{a.track}</td>
+                    <td className="small nowrap">{a.presentType}</td>
                     <td className="right num">{a.scores.length ? avg(a).toFixed(1) : '-'}</td>
                     <td>
                       <Badge tone={a.status === '채택' ? 'good' : a.status === '반려' ? 'critical' : a.status === '수정요청' ? 'serious' : 'warning'}>{a.status}</Badge>
@@ -199,10 +211,15 @@ export function Abstracts() {
                         onChange={e => dispatch({ type: 'PATCH_ABSTRACT', id: a.id, patch: { status: e.target.value as Abstract['status'], decisionAt: today() } })}>
                         {['접수', '심사중', '채택', '수정요청', '반려', '철회'].map(v => <option key={v}>{v}</option>)}
                       </select>
+                      <button className="btn btn-sm" title="상세 수정" style={{ marginLeft: 4 }} onClick={() => setEditAbstract(a)}>✎</button>
                     </td>
                   </tr>
                 ))}
-                {!rows.length && <tr><td colSpan={8}><Empty>조건에 맞는 초록이 없습니다.</Empty></td></tr>}
+                {!rows.length && (
+                  <tr><td colSpan={8}><Empty>
+                    {all.length ? '조건에 맞는 초록이 없습니다.' : '등록된 초록이 없습니다. 「＋ 초록 등록」으로 직접 넣거나 「⬆ CSV 일괄 등록」으로 투고 파일을 올리세요.'}
+                  </Empty></td></tr>
+                )}
               </tbody>
             </table>
           </div>

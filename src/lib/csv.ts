@@ -70,3 +70,52 @@ function openCopyPanel(filename: string, body: string) {
   document.body.appendChild(wrap)
   ta.focus(); ta.select()
 }
+
+/* ───────────────────────── CSV 읽기 (일괄 등록) ───────────────────────── */
+
+/**
+ * CSV 한 줄을 셀로 나눈다. 따옴표 안의 쉼표·줄바꿈과 ""(이스케이프된 따옴표)를 처리한다.
+ * 엑셀에서 저장한 파일을 그대로 올릴 수 있어야 하므로 직접 파싱한다.
+ */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let cell = ''
+  let quoted = false
+  // UTF-8 BOM 제거 — 엑셀 저장 파일에 붙는다
+  const src = text.replace(/^﻿/, '')
+
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i]
+    if (quoted) {
+      if (c === '"') {
+        if (src[i + 1] === '"') { cell += '"'; i++ }
+        else quoted = false
+      } else cell += c
+      continue
+    }
+    if (c === '"') { quoted = true; continue }
+    if (c === ',') { row.push(cell); cell = ''; continue }
+    if (c === '\r') continue
+    if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; continue }
+    cell += c
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row) }
+  return rows.filter(r => r.some(x => x.trim() !== ''))
+}
+
+/**
+ * 머리글 행을 읽어 { 열이름: 값 } 목록으로 바꾼다.
+ * 열 순서가 달라도 머리글 이름으로 찾으므로, 받은 파일을 그대로 올릴 수 있다.
+ */
+export function readCsvObjects(text: string): { headers: string[]; rows: Record<string, string>[] } {
+  const raw = parseCsv(text)
+  if (!raw.length) return { headers: [], rows: [] }
+  const headers = raw[0].map(h => h.trim())
+  const rows = raw.slice(1).map(r => {
+    const o: Record<string, string> = {}
+    headers.forEach((h, i) => { o[h] = (r[i] ?? '').trim() })
+    return o
+  })
+  return { headers, rows }
+}

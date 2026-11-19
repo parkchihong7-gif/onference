@@ -28,6 +28,8 @@ export type Action =
   | { type: 'ADD_COMMENT'; comment: Comment }
   | { type: 'TOGGLE_COMMENT'; id: string }
   | { type: 'PATCH_ABSTRACT'; id: string; patch: Partial<Abstract> }
+  | { type: 'ADD_ABSTRACTS'; abstracts: Abstract[] }
+  | { type: 'DELETE_ABSTRACT'; id: string }
   | { type: 'PATCH_REGISTRATION'; id: string; patch: Partial<Registration> }
   | { type: 'PATCH_SPONSOR'; id: string; patch: Partial<Sponsor> }
   | { type: 'ADD_SPONSOR'; sponsor: Sponsor }

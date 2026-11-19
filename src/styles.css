@@ -163,6 +163,8 @@ table { border-collapse: collapse; width: 100%; }
 .small { font-size: 12px; }
 .xsmall { font-size: 11px; }
 .num { font-variant-numeric: tabular-nums; }
+/* 표 안의 번호·코드·연락처는 하이픈에서 쪼개지지 않게 한 줄로 유지한다 */
+table.data .num { white-space: nowrap; }
 .right { text-align: right; }
 .nowrap { white-space: nowrap; }
 .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -189,7 +191,7 @@ table { border-collapse: collapse; width: 100%; }
 .search { flex: 1; max-width: 340px; }
 
 /* 배지 */
-.badge {
+.badge { white-space: nowrap;
   display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
   font-size: 11.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent;
 }
@@ -207,7 +209,7 @@ table { border-collapse: collapse; width: 100%; }
 :root[data-theme='dark'] .t-serious { color: #f0a684; }
 :root[data-theme='dark'] .t-critical { color: #f08585; }
 
-.chip {
+.chip { white-space: nowrap;
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px;
   background: var(--surface-2); border: 1px solid var(--line); font-size: 11.5px; color: var(--ink-2);
 }
@@ -223,12 +225,12 @@ table { border-collapse: collapse; width: 100%; }
 /* 테이블 */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
 table.data { font-size: 13px; }
-table.data th {
+table.data th { word-break: keep-all;
   text-align: left; font-weight: 600; font-size: 11.5px; color: var(--ink-3); letter-spacing: .02em;
   padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2);
   position: sticky; top: 0; white-space: nowrap;
 }
-table.data td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.data td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; word-break: keep-all; }
 table.data tbody tr:last-child td { border-bottom: 0; }
 table.data tbody tr:hover { background: var(--surface-2); }
 table.data tr.clickable { cursor: pointer; }
