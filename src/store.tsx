@@ -30,6 +30,9 @@ export type Action =
   | { type: 'PATCH_ABSTRACT'; id: string; patch: Partial<Abstract> }
   | { type: 'PATCH_REGISTRATION'; id: string; patch: Partial<Registration> }
   | { type: 'PATCH_SPONSOR'; id: string; patch: Partial<Sponsor> }
+  | { type: 'ADD_SPONSOR'; sponsor: Sponsor }
+  | { type: 'DELETE_SPONSOR'; id: string }
+  | { type: 'ADD_CREDIT'; credit: CreditProgram }
   | { type: 'PATCH_CREDIT'; id: string; patch: Partial<CreditProgram> }
   | { type: 'ADD_CONFERENCE'; conference: Conference; sessions: Session[]; tasks: Task[] }
   | { type: 'PATCH_CONFERENCE'; id: string; patch: Partial<Conference> }

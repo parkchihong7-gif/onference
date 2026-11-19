@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { useApp } from '../store'
 import { activeConference, sessionsOf } from '../lib/metrics'
 import { Badge, Card, Empty, HBars, StackBar, StatTile, StatusBadge } from '../components/ui'
+import { CreditDialog, SponsorDialog } from '../components/DomesticEdit'
 import { Comments } from '../components/Comments'
 import { ddayLabel, fmtDate, krw, krwShort, pct, today } from '../lib/format'
 import { downloadCsv } from '../lib/csv'
@@ -15,6 +16,8 @@ import type { Abstract, CreditProgram, Registration, Sponsor } from '../types'
 
 export function Credits() {
   const { state, dispatch } = useApp()
+  const [addCredit, setAddCredit] = useState(false)
+  const [editCredit, setEditCredit] = useState<CreditProgram | undefined>()
   const conf = activeConference(state)
   const list = state.creditPrograms.filter(c => c.conferenceId === conf.id)
   const sessions = sessionsOf(state)
@@ -32,11 +35,16 @@ export function Credits() {
             평점은 <strong>면허번호가 등록된 참가자</strong>에게만 부여되므로, 등록 단계에서 면허번호 누락을 함께 점검합니다.
           </p>
         </div>
-        <button className="btn no-print" onClick={() => downloadCsv(`${conf.code}_연수평점_신청현황.csv`, [
+        <div className="row-wrap no-print">
+        <button className="btn btn-primary" onClick={() => setAddCredit(true)}>＋ 평점 신청 등록</button>
+        <button className="btn" onClick={() => downloadCsv(`${conf.code}_연수평점_신청현황.csv`, [
           ['인정기관', '평점구분', '신청평점', '승인평점', '신청번호', '상태', '제출일', '결과일', '부여조건'],
           ...list.map(c => [c.authority, c.category, c.appliedCredits, c.approvedCredits, c.applicationNo, c.status, c.submittedAt, c.resultAt, c.condition]),
         ])}>⬇ 신청현황 내보내기</button>
+        </div>
       </div>
+      <CreditDialog open={addCredit} onClose={() => setAddCredit(false)} />
+      <CreditDialog edit={editCredit} open={!!editCredit} onClose={() => setEditCredit(undefined)} />
 
       <div className="grid g4">
         <StatTile label="승인 평점" value={approved} unit="평점" tone="good" foot={`신청 ${list.reduce((a, c) => a + c.appliedCredits, 0)}평점 중`} />
@@ -68,10 +76,11 @@ export function Credits() {
                       onChange={e => dispatch({ type: 'PATCH_CREDIT', id: c.id, patch: { status: e.target.value as CreditProgram['status'] } })}>
                       {['준비', '신청', '심사중', '승인', '보완요청', '반려'].map(v => <option key={v}>{v}</option>)}
                     </select>
+                    <button className="btn btn-sm" title="상세 수정" style={{ marginLeft: 4 }} onClick={() => setEditCredit(c)}>✎</button>
                   </td>
                 </tr>
               ))}
-              {!list.length && <tr><td colSpan={10}><Empty>등록된 평점 신청이 없습니다.</Empty></td></tr>}
+              {!list.length && <tr><td colSpan={10}><Empty>등록된 평점 신청이 없습니다. 위 「＋ 평점 신청 등록」으로 추가하세요.</Empty></td></tr>}
             </tbody>
           </table>
         </div>
@@ -342,6 +351,8 @@ export function Registrations() {
 
 export function Sponsors() {
   const { state, dispatch } = useApp()
+  const [addSponsor, setAddSponsor] = useState(false)
+  const [editSponsor, setEditSponsor] = useState<Sponsor | undefined>()
   const conf = activeConference(state)
   const all = state.sponsors.filter(s => s.conferenceId === conf.id)
   const [sel, setSel] = useState<string | null>(null)
@@ -362,11 +373,16 @@ export function Sponsors() {
             현장 운영과 연결해 누락 없이 이행합니다.
           </p>
         </div>
-        <button className="btn no-print" onClick={() => downloadCsv(`${conf.code}_후원전시현황.csv`, [
+        <div className="row-wrap no-print">
+        <button className="btn btn-primary" onClick={() => setAddSponsor(true)}>＋ 후원사 등록</button>
+        <button className="btn" onClick={() => downloadCsv(`${conf.code}_후원전시현황.csv`, [
           ['업체', '등급', '금액', '담당자', '연락처', '부스', '계약상태', '제공항목', '마감일'],
           ...all.map(s => [s.company, s.tier, s.amount, s.contactName, s.contactEmail, s.boothNo, s.contractStatus, s.benefits.join(' / '), s.dueDate]),
         ])}>⬇ 후원 현황 내보내기</button>
+        </div>
       </div>
+      <SponsorDialog open={addSponsor} onClose={() => setAddSponsor(false)} />
+      <SponsorDialog edit={editSponsor} open={!!editSponsor} onClose={() => setEditSponsor(undefined)} />
 
       <div className="grid g4">
         <StatTile label="후원 총액(제안 포함)" value={krwShort(total)} unit="원" foot={`${all.length}개사`} />
@@ -384,6 +400,7 @@ export function Sponsors() {
             <table className="data">
               <thead><tr><th>업체</th><th>등급</th><th className="right">금액</th><th>부스</th><th>담당자</th><th>마감</th><th>상태</th><th className="no-print">변경</th></tr></thead>
               <tbody>
+                {!all.length && <tr><td colSpan={8} className="empty">등록된 후원사가 없습니다. 「＋ 후원사 등록」으로 추가하세요.</td></tr>}
                 {all.map(s => (
                   <tr key={s.id} className="clickable" onClick={() => setSel(s.id)}>
                     <td><strong>{s.company}</strong></td>
@@ -398,6 +415,7 @@ export function Sponsors() {
                         onChange={e => dispatch({ type: 'PATCH_SPONSOR', id: s.id, patch: { contractStatus: e.target.value as Sponsor['contractStatus'] } })}>
                         {['제안', '협의', '계약완료', '입금완료', '취소'].map(v => <option key={v}>{v}</option>)}
                       </select>
+                      <button className="btn btn-sm" title="상세 수정" style={{ marginLeft: 4 }} onClick={() => setEditSponsor(s)}>✎</button>
                     </td>
                   </tr>
                 ))}

@@ -200,6 +200,33 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
     case 'PATCH_REGISTRATION':
       return [{ kind: 'patch', col: 'registrations', id: action.id, data: action.patch as Record<string, unknown> }]
 
+    case 'ADD_SPONSOR':
+      return [
+        { kind: 'set', col: 'sponsors', id: action.sponsor.id, data: action.sponsor as unknown as Record<string, unknown> },
+        auditMut(actor, {
+          action: '생성', entityType: '행사', entityId: action.sponsor.id, entityLabel: action.sponsor.company,
+          field: '후원사 등록', after: `${action.sponsor.tier} · ${action.sponsor.amount.toLocaleString()}원`,
+        }),
+      ]
+
+    case 'DELETE_SPONSOR': {
+      const sp = state.sponsors.find(x => x.id === action.id)
+      if (!sp) return []
+      return [
+        { kind: 'delete', col: 'sponsors', id: sp.id },
+        auditMut(actor, { action: '삭제', entityType: '행사', entityId: sp.id, entityLabel: sp.company, field: '후원사 삭제' }),
+      ]
+    }
+
+    case 'ADD_CREDIT':
+      return [
+        { kind: 'set', col: 'creditPrograms', id: action.credit.id, data: action.credit as unknown as Record<string, unknown> },
+        auditMut(actor, {
+          action: '생성', entityType: '행사', entityId: action.credit.id, entityLabel: `${action.credit.authority} ${action.credit.category}`,
+          field: '연수평점 신청 등록', after: `${action.credit.appliedCredits}평점`,
+        }),
+      ]
+
     case 'PATCH_SPONSOR': {
       const s = state.sponsors.find(x => x.id === action.id)
       if (!s) return []
