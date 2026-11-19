@@ -29,20 +29,34 @@ export function Settings() {
     invites.list().then(setInviteList).catch(() => setInviteList([]))
   }, [invites])
 
+  /** 권한 오류는 원인이 서로 달라 메시지를 구분해 준다 */
+  const reason = (e: unknown) => {
+    const m = String((e as { message?: string })?.message ?? e)
+    return m.includes('permission-denied')
+      ? '권한이 없습니다. 사무국 역할로 로그인했는지 확인하세요.'
+      : m.replace(/^FirebaseError:\s*/, '')
+  }
+
+  const refreshInvites = async () => {
+    try { setInviteList(await invites.list()) } catch { /* 목록은 못 가져와도 초대 자체는 유효하다 */ }
+  }
+
   const addInvite = async () => {
     if (!email.includes('@')) { setMsg('이메일 형식을 확인하세요.'); return }
+    // 등록과 목록 조회를 한 묶음으로 처리하면, 목록 조회 실패가 '초대 실패'로 잘못 보인다
     try {
       await invites.add({ email, name: name || email.split('@')[0], role, org: '' })
-      setInviteList(await invites.list())
-      setEmail(''); setName(''); setMsg('초대했습니다. 해당 계정으로 로그인하면 바로 접근됩니다.')
-    } catch (e) { setMsg(`초대 실패: ${String(e)}`) }
+    } catch (e) { setMsg(`초대 실패: ${reason(e)}`); return }
+    setEmail(''); setName(''); setMsg('초대했습니다. 해당 계정으로 로그인하면 바로 접근됩니다.')
+    await refreshInvites()
   }
 
   const revoke = async (target: string) => {
     try {
       await invites.revoke(target)
-      setInviteList(await invites.list())
-    } catch (e) { setMsg(`회수 실패: ${String(e)}`) }
+    } catch (e) { setMsg(`회수 실패: ${reason(e)}`); return }
+    setMsg(`${target} 초대를 회수했습니다.`)
+    await refreshInvites()
   }
 
   const reset = () => {

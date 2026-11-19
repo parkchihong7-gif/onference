@@ -26,7 +26,10 @@ service cloud.firestore {
 
     // 초대장 — 사무국이 이메일로 미리 등록해 두면, 첫 로그인 때 본인이 멤버 문서를 만든다
     match /memberInvites/{email} {
-      allow read: if signedIn() && request.auth.token.email == email;
+      // 단건 조회: 사무국, 또는 본인 앞으로 온 초대장(첫 로그인 승격에 필요)
+      allow get: if admin() || (signedIn() && request.auth.token.email == email);
+      // 목록 조회: 사무국만 — 구성원 관리 화면에서 초대 현황을 보기 위해 필요하다
+      allow list: if admin();
       allow write: if admin();
     }
 

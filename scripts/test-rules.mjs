@@ -76,6 +76,24 @@ await check('초대장에 없는 역할로는 승격할 수 없다', async () =>
 })
 
 /* 5) 실시간 동기화 — 한 사람의 수정이 다른 사람에게 도착하는가 */
+/* 초대 관리 — 사무국은 목록 조회·등록·철회를 모두 할 수 있어야 한다 */
+await check('사무국은 초대장 목록을 조회할 수 있다', () => assertSucceeds(getDocs(collection(admin, 'memberInvites'))))
+await check('사무국은 초대장을 등록할 수 있다', () =>
+  assertSucceeds(setDoc(doc(admin, 'memberInvites', 'xenayoon7@gmail.com'), { email: 'xenayoon7@gmail.com', name: '윤재인', role: '사무국', org: '' })))
+await check('사무국은 초대장을 철회할 수 있다', () => assertSucceeds(deleteDoc(doc(admin, 'memberInvites', 'new@x.org'))))
+await check('사무국이 아니면 초대장 목록을 볼 수 없다', () => assertFails(getDocs(collection(liaison, 'memberInvites'))))
+await check('본인 앞으로 온 초대장은 본인이 읽을 수 있다', async () => {
+  const me = env.authenticatedContext('u-new', { email: 'new2@x.org' }).firestore()
+  await env.withSecurityRulesDisabled(async ctx => {
+    await setDoc(doc(ctx.firestore(), 'memberInvites', 'new2@x.org'), { email: 'new2@x.org', name: '신규2', role: '리에종' })
+  })
+  await assertSucceeds(getDoc(doc(me, 'memberInvites', 'new2@x.org')))
+})
+await check('남의 초대장은 읽을 수 없다', async () => {
+  const me = env.authenticatedContext('u-other', { email: 'other@x.org' }).firestore()
+  await assertFails(getDoc(doc(me, 'memberInvites', 'new2@x.org')))
+})
+
 await check('한 담당자의 수정이 다른 담당자 화면에 실시간 반영된다', async () => {
   const received = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('5초 안에 변경이 도착하지 않음')), 5000)

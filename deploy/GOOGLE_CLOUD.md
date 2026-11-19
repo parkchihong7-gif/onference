@@ -63,6 +63,7 @@ bash deploy/deploy-cloudrun.sh
 | 실시간 로그 보기 | `gcloud beta run services logs tail onference --region asia-northeast3` |
 | **현재 설정·주소 확인** | `bash deploy/show-config.sh` |
 | 구글 로그인 승인 도메인 등록 | `bash deploy/authorize-domain.sh` |
+| 접근 규칙만 다시 배포 | `bash deploy/update-rules.sh` |
 | 비밀번호 떼기 | `gcloud run services update onference --region asia-northeast3 --remove-env-vars AUTH_USER,AUTH_PASS` |
 | 서비스 삭제 | `gcloud run services delete onference --region asia-northeast3` |
 
@@ -80,6 +81,15 @@ cd ~/onference && bash deploy/authorize-domain.sh
 
 `setup-firebase.sh` 는 마지막 단계에서 이 등록까지 자동으로 한다. 콘솔에서 직접 해도 된다 —
 Authentication → 설정 → 승인된 도메인 → 도메인 추가.
+
+### 구성원 초대에서 permission-denied 가 뜰 때
+
+접근 규칙이 옛 버전이면 사무국도 초대 목록을 조회하지 못해, 초대 자체는 성공해도
+"초대 실패" 로 보인다. 규칙만 다시 배포하면 된다(앱 재배포 불필요).
+
+```bash
+cd ~/onference && git pull && bash deploy/update-rules.sh
+```
 
 ### 구글 로그인은 됐는데 "이 계정은 아직 초대되지 않았습니다" 가 뜰 때
 
