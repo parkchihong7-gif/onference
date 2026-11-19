@@ -61,7 +61,7 @@ export function Settlement() {
 
       <div className="grid g2">
         <Card title="비목별 실비(약정)" sub="단위: 만원">
-          <HBars data={byCat} unit="만원" />
+          <HBars data={byCat} unit="만원" empty="아직 약정된 실비(항공·숙박·교통 등)가 없습니다. 교통·숙박 화면에서 예약을 등록하면 집계됩니다." />
         </Card>
         <Card title="예산 구성" sub="사례비 vs 실비">
           <StackBar height={14} valueFormat={n => `${krwShort(n)}원`} segments={[

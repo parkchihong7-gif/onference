@@ -175,10 +175,12 @@ export function Donut({ data, size = 132, centerLabel, centerValue }: {
   )
 }
 
-export function HBars({ data, unit = '명', color = 'var(--seq-400)' }: {
-  data: { label: string; value: number; note?: string; color?: string }[]; unit?: string; color?: string
+export function HBars({ data, unit = '명', color = 'var(--seq-400)', empty = '표시할 데이터가 없습니다.' }: {
+  data: { label: string; value: number; note?: string; color?: string }[]
+  unit?: string; color?: string; empty?: string
 }) {
   const max = Math.max(...data.map(d => d.value), 1)
+  if (!data.length) return <div className="empty">{empty}</div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
       {data.map(d => (

@@ -201,7 +201,7 @@ export function Abstracts() {
 
         <div className="grid" style={{ gap: 14 }}>
           <Card title="트랙별 투고">
-            <HBars data={byTrack} unit="편" />
+            <HBars data={byTrack} unit="편" empty="접수된 초록이 없습니다. 초록 공모가 시작되면 트랙별로 집계됩니다." />
           </Card>
           <Card title="심사 상태 구성">
             <StackBar height={12} valueFormat={n => `${n}편`} segments={[
@@ -282,7 +282,7 @@ export function Registrations() {
       </div>
 
       <div className="grid g2">
-        <Card title="구분별 등록"><HBars data={byType} unit="명" /></Card>
+        <Card title="구분별 등록"><HBars data={byType} unit="명" empty="아직 등록자가 없습니다." /></Card>
         <Card title="사전등록 마감 안내" sub="할인 등록 마감까지">
           <div className="dl">
             <dt>할인 마감</dt><dd>{fmtDate(conf.milestones.find(m => m.label.includes('사전등록'))?.date)} ({ddayLabel(conf.milestones.find(m => m.label.includes('사전등록'))?.date)})</dd>
@@ -406,7 +406,7 @@ export function Sponsors() {
           </div>
         </Card>
         <div className="grid" style={{ gap: 14 }}>
-          <Card title="등급 구성"><HBars data={byTier} unit="개사" /></Card>
+          <Card title="등급 구성"><HBars data={byTier} unit="개사" empty="계약된 후원사가 없습니다." /></Card>
           {selected ? (
             <Card title={selected.company} sub={`${selected.tier} · ${krw(selected.amount)}`}
               right={<button className="btn btn-sm no-print" onClick={() => setSel(null)}>닫기</button>}>

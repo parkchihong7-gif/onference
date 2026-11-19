@@ -1,3 +1,4 @@
+import { OVERSEAS_MODULES } from '../types'
 /**
  * 액션 → 문서 변경(Mutation) 변환 계층
  *
@@ -244,7 +245,21 @@ export function mutationsFor(state: AppState, action: Action): Mutation[] {
 
     case 'ADD_SPEAKER': {
       const name = action.speaker.nameKo || action.speaker.nameEn
+      // 국내 행사라도 해외 연자가 들어오면 출입국·해외송금 업무가 실제로 발생한다.
+      // 관련 모듈이 꺼져 있으면 메뉴가 보이지 않아 업무를 놓치므로 함께 켠다.
+      const conf = state.conferences.find(c => c.id === action.speaker.conferenceId)
+      const needOverseas = action.speaker.residency === '해외' && conf
+        ? OVERSEAS_MODULES.filter(m => !conf.modules.includes(m))
+        : []
       return [
+        ...(needOverseas.length && conf ? [
+          { kind: 'patch' as const, col: 'conferences' as const, id: conf.id, data: { modules: [...conf.modules, ...needOverseas] } },
+          auditMut(actor, {
+            action: '수정', entityType: '행사', entityId: conf.id, entityLabel: conf.nameKo,
+            field: '모듈 구성', after: needOverseas.join(', '),
+            memo: `해외 ${name} 등록으로 자동 활성화`,
+          }),
+        ] : []),
         { kind: 'set', col: 'speakers', id: action.speaker.id, data: action.speaker as unknown as Record<string, unknown> },
         ...action.tasks.map(x => ({ kind: 'set' as const, col: 'tasks' as const, id: x.id, data: x as unknown as Record<string, unknown> })),
         auditMut(actor, {

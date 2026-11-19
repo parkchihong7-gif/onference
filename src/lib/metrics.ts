@@ -382,11 +382,17 @@ export function validateSpeaker(sp: Speaker, conf: Conference): DataIssue[] {
       '여행사에 스케줄 요청(요금 보장 마감 확인)')
   }
 
-  /* 8. 정산 정보 */
+  /* 8. 정산 정보 — 국내는 계좌·주민번호 수집, 해외는 해외송금 정보로 요건이 다르다 */
   if (isConfirmed(sp) && sp.settlement.honorarium > 0 && !sp.settlement.remittance) {
-    push('경고', '송금 정보',
-      '강연료 지급 대상이나 해외 송금 정보가 없습니다.',
-      '송금 정보 양식 발송(은행·SWIFT·수취인)')
+    if (overseas) {
+      push('경고', '송금 정보',
+        `해외 ${L}의 강연료 지급 대상이나 해외 송금 정보가 없습니다.`,
+        '송금 정보 양식 발송(은행·SWIFT·수취인)')
+    } else {
+      push('경고', '지급 정보',
+        `${labelsOf(conf).honorarium} 지급 대상이나 입금 계좌 정보가 없습니다.`,
+        '지급 정보 수집(예금주·은행·계좌번호, 원천징수 자료)')
+    }
   }
   if (sp.settlement.taxTreatyApplied && !sp.settlement.corReceived) {
     push('확인', '조세조약',

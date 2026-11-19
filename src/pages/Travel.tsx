@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { FlightDialog, HotelDialog } from '../components/TravelEdit'
+import type { Flight } from '../types'
 import { useApp } from '../store'
 import { activeConference, speakersOf } from '../lib/metrics'
 import { Badge, Card, Empty, Segmented, StatTile, StatusBadge } from '../components/ui'
@@ -13,6 +15,9 @@ export function Travel() {
   const conf = activeConference(state)
   const list = speakersOf(state).filter(s => !['거절', '취소'].includes(s.stage))
   const [view, setView] = useState<'항공' | '숙박' | '의전·배차'>('항공')
+  const [picked, setPicked] = useState('')
+  const [flightFor, setFlightFor] = useState<{ id: string; flight?: Flight } | undefined>()
+  const [hotelFor, setHotelFor] = useState<string | undefined>()
 
   const flights = list.flatMap(s => s.flights.map(f => ({ s, f }))).sort((a, b) =>
     (a.f.direction === '입국' ? a.f.arriveAt : a.f.departAt) < (b.f.direction === '입국' ? b.f.arriveAt : b.f.departAt) ? -1 : 1)
@@ -29,8 +34,17 @@ export function Travel() {
   const totalAir = list.flatMap(s => s.settlement.expenses).filter(e => e.category === '항공').reduce((a, e) => a + e.amountKRW, 0)
   const totalHotel = hotels.reduce((a, s) => a + s.hotel!.nights * s.hotel!.ratePerNight, 0)
 
+  const pickedSpeaker = (id: string) => list.find(s => s.id === id)
+
   return (
     <>
+      {flightFor && pickedSpeaker(flightFor.id) && (
+        <FlightDialog open onClose={() => setFlightFor(undefined)}
+          speaker={pickedSpeaker(flightFor.id)!} edit={flightFor.flight} />
+      )}
+      {hotelFor && pickedSpeaker(hotelFor) && (
+        <HotelDialog open onClose={() => setHotelFor(undefined)} speaker={pickedSpeaker(hotelFor)!} />
+      )}
       <div className="page-head">
         <div>
           <h1 className="page-title">교통·숙박·의전</h1>
@@ -42,6 +56,16 @@ export function Travel() {
         <div className="row-wrap no-print">
           <Segmented options={['항공', '숙박', '의전·배차']} value={view} onChange={setView} />
           <button className="btn" onClick={exportRooming}>⬇ 루밍리스트</button>
+          <select className="select" value={picked} onChange={e => setPicked(e.target.value)} style={{ maxWidth: 190 }}>
+            <option value="">{labels.speaker} 선택…</option>
+            {list.filter(s => ['수락', '계약완료'].includes(s.stage)).map(s => (
+              <option key={s.id} value={s.id}>{displayName(s)}</option>
+            ))}
+          </select>
+          <button className="btn btn-primary" disabled={!picked}
+            onClick={() => (view === '숙박' ? setHotelFor(picked) : setFlightFor({ id: picked }))}>
+            ＋ {view === '숙박' ? '숙박' : '이동'} 등록
+          </button>
         </div>
       </div>
 
@@ -86,7 +110,7 @@ export function Travel() {
           <Card title="전체 이동 여정">
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th>구분</th><th>{labels.speaker}</th><th>수단</th><th>편명</th><th>출발</th><th>도착</th><th>등급</th><th>예약 주체</th><th className="right">운임</th></tr></thead>
+                <thead><tr><th>구분</th><th>{labels.speaker}</th><th>수단</th><th>편명</th><th>출발</th><th>도착</th><th>등급</th><th>예약 주체</th><th className="right">운임</th><th className="no-print">관리</th></tr></thead>
                 <tbody>
                   {flights.map(({ s, f }) => (
                     <tr key={f.id}>
@@ -99,8 +123,12 @@ export function Travel() {
                       <td className="small">{f.cabin}</td>
                       <td className="small">{f.ticketedBy}</td>
                       <td className="right num">{f.fare ? money(f.fare, f.currency) : '-'}</td>
+                      <td className="no-print">
+                        <button className="btn btn-sm" title="수정" onClick={() => setFlightFor({ id: s.id, flight: f })}>✎</button>
+                      </td>
                     </tr>
                   ))}
+                  {!flights.length && <tr><td colSpan={10} className="empty">등록된 이동 일정이 없습니다. 위에서 {labels.speaker}를 고르고 「＋ 이동 등록」을 누르세요.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -112,7 +140,7 @@ export function Travel() {
         <Card title="루밍 리스트" sub="호텔 제출용 · Excel 내보내기 지원">
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>{labels.speaker}</th><th>등급</th><th>호텔</th><th>체크인</th><th>체크아웃</th><th>박</th><th>객실</th><th>정산</th><th>예약번호</th><th>요청</th></tr></thead>
+              <thead><tr><th>{labels.speaker}</th><th>등급</th><th>호텔</th><th>체크인</th><th>체크아웃</th><th>박</th><th>객실</th><th>정산</th><th>예약번호</th><th>요청</th><th className="no-print">관리</th></tr></thead>
               <tbody>
                 {hotels.map(s => (
                   <tr key={s.id} className="clickable" onClick={() => go('speakers', s.id)}>
@@ -126,6 +154,9 @@ export function Travel() {
                     <td className="small nowrap">{s.hotel!.billing}</td>
                     <td className="num small">{s.hotel!.confirmationNo ?? <Badge tone="warning">미확정</Badge>}</td>
                     <td className="xsmall muted">{s.hotel!.requests ?? s.dietary ?? '-'}</td>
+                    <td className="no-print" onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-sm" title="수정" onClick={() => setHotelFor(s.id)}>✎</button>
+                    </td>
                   </tr>
                 ))}
                 {!hotels.length && <tr><td colSpan={10} className="empty">숙박 배정 내역이 없습니다.</td></tr>}

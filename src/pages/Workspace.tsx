@@ -241,15 +241,19 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
         <div className="grid g2">
           <Card title="인적 사항">
             <DL items={[
-              ['성명(EN)', sp.nameEn], ['직위', sp.title],
+              // 국내 연자는 한글 성명이 본명이므로 함께 보여 준다
+              ...(sp.nameKo && sp.nameKo !== sp.nameEn ? [['성명(국문)', sp.nameKo] as [string, string]] : []),
+              ['성명(영문)', sp.nameEn], ['직위', sp.title],
               ['소속 / 팀', `${sp.affiliation}${sp.department ? ` / ${sp.department}` : ''}`],
-              ['국가·도시', `${flag(sp.country)} ${sp.country} · ${sp.city}`],
+              ['국가·도시', `${flag(sp.country)} ${sp.country}${sp.city ? ` · ${sp.city}` : ''}`.trim()],
               ['타임존', sp.timezone], ['이메일', sp.email], ['연락처', sp.phone],
               ['비서/사무실', sp.assistantEmail ?? '-'],
               ['사용 언어', sp.languages.join(', ')],
               ['전문 분야', sp.researchFields.join(' · ')],
             ]} />
           </Card>
+          {/* 국내 연자에게는 여권·사증 절차가 없다. 빈 항목만 보이면 혼동을 준다 */}
+          {sp.residency === '해외' ? (
           <Card title="여권 · 사증">
             <DL items={[
               ['여권 영문명', sp.passport?.nameEn], ['여권번호', sp.passport?.numberMasked],
@@ -261,6 +265,16 @@ function Detail({ sp, tab, setTab, sub, setSub, onAttendance, onProgram }: {
               ['공관', sp.visa.consulate],
             ]} />
           </Card>
+          ) : (
+          <Card title="국내 연자" sub="출입국·사증 절차가 적용되지 않습니다">
+            <DL items={[
+              ['구분', '국내 거주자'],
+              ['원천징수', '기타소득 8.8% 또는 사업소득 3.3%'],
+              ['필요 서류', '입금 계좌·신분증 사본, 사례비 지급 동의'],
+              ['교통', 'KTX·국내선·자가용 등 국내 이동 지원'],
+            ]} />
+          </Card>
+          )}
           <Card title="요구 사항">
             <DL items={[
               ['식이', sp.dietary], ['접근성', sp.accessibility],

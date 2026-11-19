@@ -46,11 +46,19 @@ export const initials = (name: string) =>
   name.replace(/^(Prof\.|Dr\.|Mr\.|Ms\.)\s/, '').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
 
 export const COUNTRY_FLAG: Record<string, string> = {
+  대한민국: '🇰🇷', 한국: '🇰🇷',
   영국: '🇬🇧', 프랑스: '🇫🇷', 싱가포르: '🇸🇬', 인도: '🇮🇳', 이집트: '🇪🇬', 독일: '🇩🇪',
   일본: '🇯🇵', 멕시코: '🇲🇽', 베트남: '🇻🇳', 미국: '🇺🇸', 나이지리아: '🇳🇬',
   네덜란드: '🇳🇱', 중국: '🇨🇳', 호주: '🇦🇺', 노르웨이: '🇳🇴', 캐나다: '🇨🇦', 이탈리아: '🇮🇹',
 }
-export const flag = (c: string) => COUNTRY_FLAG[c] ?? '🌐'
+/** 기준일 대비 D 표기 (개막일 기준 마일스톤 표시에 쓴다) */
+export const ddayFrom = (base: string, date: string) => {
+  const d = Math.round((new Date(date).getTime() - new Date(base).getTime()) / 86400000)
+  return d === 0 ? 'D-DAY' : d < 0 ? `D${d}` : `D+${d}`
+}
+
+/** 국가명 → 국기. 값이 없으면 아이콘을 붙이지 않는다(빈 자리에 🌐 가 뜨면 오해를 준다) */
+export const flag = (c: string) => (c ? COUNTRY_FLAG[c] ?? '🌐' : '')
 
 /** 상태 → 시맨틱 톤 (색은 항상 아이콘/라벨과 함께 사용) */
 export type Tone = 'good' | 'warning' | 'serious' | 'critical' | 'neutral' | 'info'

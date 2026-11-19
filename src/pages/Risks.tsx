@@ -1,4 +1,4 @@
-import { labelsOf } from '../lib/scope'
+import { labelsOf, displayName } from '../lib/scope'
 import { useApp } from '../store'
 import { activeConference, computeRisks, validateAll } from '../lib/metrics'
 import { Badge, Card, StatTile } from '../components/ui'
@@ -85,7 +85,7 @@ export function Risks() {
               {quality.flatMap(({ speaker, issues }) => issues.map(i => (
                 <tr key={i.id} className="clickable" onClick={() => go('speakers', speaker.id)}>
                   <td><Badge tone={i.level === '오류' ? 'critical' : i.level === '경고' ? 'warning' : 'info'}>{i.level}</Badge></td>
-                  <td className="nowrap">{flag(speaker.country)} {speaker.nameEn}</td>
+                  <td className="nowrap">{flag(speaker.country)} {displayName(speaker)}</td>
                   <td className="small nowrap">{i.field}</td>
                   <td className="small">{i.message}</td>
                   <td className="xsmall muted">{i.action}</td>

@@ -1,7 +1,7 @@
 import { useApp } from '../store'
 import { activeConference, auditOf, computeRisks, kpis, readiness, speakersOf, tasksOf, validateAll } from '../lib/metrics'
 import { Card, Donut, Funnel, Gantt, HBars, StackBar, StatTile, Badge, Progress } from '../components/ui'
-import { ddayLabel, flag, fmtDate, fmtDateTime, krwShort, pct, today } from '../lib/format'
+import { ddayLabel, flag, fmtDate, fmtDateTime, krwShort, pct, today, ddayFrom } from '../lib/format'
 import { displayName, hasModule, labelsOf, overseasSpeakers } from '../lib/scope'
 import { addDays } from '../data/seed'
 import { go } from '../lib/router'
@@ -191,10 +191,13 @@ export function Dashboard() {
             foot={`목표 ${Math.round(conf.expectedAttendees * 0.75)}명 · 수납률 ${pct(regs.filter(r => r.paid).length, regs.length)}%`}
             bar={pct(regs.length, Math.round(conf.expectedAttendees * 0.75))} tone="info" />
         ) : (
-          <StatTile label="제출물 검수" value={`${k.docDone}/${k.docTotal}`} bar={pct(k.docDone, k.docTotal)} tone="info" foot={`${labels.speaker} 제출 서류`} />
+          <StatTile label="제출물 검수" value={`${k.docDone}/${k.docTotal}`} bar={pct(k.docDone, k.docTotal)} tone="info"
+            foot={k.confirmed ? `확정 ${labels.speaker} ${k.confirmed}명의 제출 서류` : `확정 ${labels.speaker}가 생기면 집계됩니다`} />
         )}
         <StatTile label="교통 확정" value={`${k.flightsTicketed}/${k.flightsNeeded}`}
-          foot={overseas.length > 0 ? '국제선 요금 보장 마감 D-60 기준' : 'KTX·국내선·자가용 포함'}
+          foot={!k.confirmed
+            ? `확정 ${labels.speaker}가 생기면 집계됩니다`
+            : overseas.length > 0 ? '국제선 요금 보장 마감 D-60 기준' : 'KTX·국내선·자가용 포함'}
           bar={pct(k.flightsTicketed, k.flightsNeeded)}
           tone={k.flightsTicketed < k.flightsNeeded ? 'serious' : 'good'} />
         <StatTile label="초청 예산 집행(약정)" value={krwShort(k.budgetCommitKRW)} unit="원"
@@ -396,15 +399,18 @@ export function Dashboard() {
       </div>
 
       <div className="grid g2">
-        <Card title="마일스톤" sub="행사 기준 역산 일정">
+        <Card title="마일스톤" sub={`개막 ${fmtDate(conf.startDate)} 기준으로 역산한 일정 · D-day 는 오늘 기준`}>
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>일정</th><th>D-day</th><th>마일스톤</th><th>단계</th><th>담당</th></tr></thead>
+              <thead><tr><th>일정</th><th>오늘 기준</th><th>개막 기준</th><th>마일스톤</th><th>단계</th><th>담당</th></tr></thead>
               <tbody>
                 {[...conf.milestones].sort((a, b) => a.date.localeCompare(b.date)).map(m => (
                   <tr key={m.id}>
                     <td className="num nowrap">{fmtDate(m.date)}</td>
-                    <td className="num nowrap"><Badge tone={m.date < today() ? 'neutral' : 'info'}>{ddayLabel(m.date)}</Badge></td>
+                    <td className="num nowrap">
+                      <Badge tone={m.date < today() ? 'serious' : 'info'}>{m.date < today() ? '기한 경과' : ddayLabel(m.date)}</Badge>
+                    </td>
+                    <td className="num nowrap small muted">{ddayFrom(conf.startDate, m.date)}</td>
                     <td>{m.label}</td>
                     <td className="small muted nowrap">{m.phase}</td>
                     <td className="small nowrap">{state.members.find(x => x.id === m.owner)?.name ?? '-'}</td>

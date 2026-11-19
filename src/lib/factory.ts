@@ -118,18 +118,26 @@ export function tasksFromTemplate(
   conferenceId: string, start: string, template: ChecklistTemplate, members: Member[], speakerId?: string, speakerName?: string,
 ): Task[] {
   const ownerFor = (role: string) => members.find(m => m.role === role)?.id ?? ROLE_OWNER[role] ?? members[0]?.id ?? 'M01'
-  return template.items.map((it, i) => ({
-    id: `${speakerId ?? conferenceId}-T${String(i + 1).padStart(2, '0')}-${Math.random().toString(36).slice(2, 6)}`,
-    conferenceId,
-    speakerId,
-    phase: it.phase,
-    title: speakerName ? `[${speakerName}] ${it.title}` : it.title,
-    ownerMemberId: ownerFor(it.ownerRole),
-    dueDate: addDays(start, it.offsetDays),
-    status: '대기' as const,
-    priority: it.offsetDays >= -14 ? ('상' as const) : ('중' as const),
-    fromTemplate: template.id,
-  }))
+  const now = today()
+  return template.items.map((it, i) => {
+    const planned = addDays(start, it.offsetDays)
+    // 행사를 늦게 등록하면 역산 기한이 이미 지나 있다. 그대로 두면 만들자마자
+    // '지연' 으로 표시돼 거짓 경고가 되므로, 지난 기한은 오늘로 당겨 잡고 사유를 남긴다.
+    const overdue = planned < now
+    return {
+      id: `${speakerId ?? conferenceId}-T${String(i + 1).padStart(2, '0')}-${Math.random().toString(36).slice(2, 6)}`,
+      conferenceId,
+      speakerId,
+      phase: it.phase,
+      title: speakerName ? `[${speakerName}] ${it.title}` : it.title,
+      ownerMemberId: ownerFor(it.ownerRole),
+      dueDate: overdue ? now : planned,
+      status: '대기' as const,
+      priority: overdue || it.offsetDays >= -14 ? ('상' as const) : ('중' as const),
+      fromTemplate: template.id,
+      ...(overdue ? { detail: `표준 일정상 기한은 ${planned}(D${it.offsetDays})입니다. 행사 등록 시점이 그보다 늦어 기한을 오늘로 조정했습니다.` } : {}),
+    }
+  })
 }
 
 export interface CreatedConference {
@@ -247,12 +255,19 @@ export function createSpeaker(state: AppState, conf: Conference, input: NewSpeak
   const overseas = input.residency === '해외'
   const pkg = state.supportPackages.find(p => p.id === input.supportPackageId)
   const plan = overseas ? OVERSEAS_DOCS : DOMESTIC_DOCS
-  const deliverables: Deliverable[] = plan.map((p, i) => ({
-    id: `${id}-D${String(i + 1).padStart(2, '0')}`,
-    type: p.type,
-    dueDate: addDays(conf.startDate, p.offset),
-    status: '요청전',
-  }))
+  // 업무와 같은 이유로, 이미 지난 제출 기한은 오늘로 당겨 잡는다.
+  // (등록하자마자 '기한 경과' 로 뜨면 실제 지연과 구분이 되지 않는다)
+  const now = today()
+  const deliverables: Deliverable[] = plan.map((p, i) => {
+    const planned = addDays(conf.startDate, p.offset)
+    return {
+      id: `${id}-D${String(i + 1).padStart(2, '0')}`,
+      type: p.type,
+      dueDate: planned < now ? now : planned,
+      status: '요청전' as const,
+      ...(planned < now ? { memo: `표준 기한 ${planned}(D${p.offset}) 경과 — 등록 시점 기준으로 조정` } : {}),
+    }
+  })
 
   const speaker: Speaker = {
     id, code: id, conferenceId: conf.id,
